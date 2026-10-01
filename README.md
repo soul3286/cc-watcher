@@ -4,6 +4,8 @@ A live, animated dashboard for **Claude Code**. While Claude Code works in your 
 
 It runs on your own computer and only **reads** Claude Code's log files. Nothing is uploaded anywhere.
 
+Website and live demo: **https://soul3286.github.io/cc-watcher/**
+
 > A free, non-commercial fan project. Not affiliated with Anthropic. See [Credits](#credits).
 
 ## Start it

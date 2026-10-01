@@ -8,7 +8,8 @@
     "test": "node --test test/progress.test.js",
     "desktop": "electron .",
     "dist": "electron-builder --win nsis",
-    "release": "node scripts/make-release.js"
+    "release": "node scripts/make-release.js",
+    "site": "node scripts/build-site.js"
   },
   "keywords": [],
   "author": "",

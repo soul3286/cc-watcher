@@ -1,5 +1,5 @@
-// Builds the shareable zip: copies an allow-list of files into release/cc-watcher/, scans the copy for private
-// details and stops on any hit, then zips it.
+// Builds the shareable zip: copies an allow-list of files into release/cc-watcher/, builds the GitHub Pages site into
+// its docs/ (scripts/build-site.js from site/; both kept out of the zip), scans it all for private details and stops on any hit, then zips it.
 //   node scripts/make-release.js                 build + scan + zip
 //   node scripts/make-release.js --scan <path>   scan only: a folder, a file, or an Electron app.asar
 // Besides the patterns below it always looks for this computer's user name and machine name, plus any extra words
@@ -12,7 +12,7 @@ const { execFileSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'release');
 const DIR = path.join(OUT, 'cc-watcher');
-const INCLUDE = ['server.js', 'package.json', 'package-lock.json', 'README.md', 'HOW-IT-WORKS.md', 'LICENSE', '.gitignore', 'start.bat', 'start.sh', 'SETUP-GUIDE.md', 'guide', 'public', 'test', 'electron', 'scripts'];
+const INCLUDE = ['server.js', 'package.json', 'package-lock.json', 'README.md', 'HOW-IT-WORKS.md', 'LICENSE', '.gitignore', 'start.bat', 'start.sh', 'SETUP-GUIDE.md', 'guide', 'site', 'public', 'test', 'electron', 'scripts'];
 const SKIP = new Set(['node_modules', '.bak', 'progress.json', 'project.json', 'desktop.json']);
 // Placeholders the docs and demo use on purpose.
 const ALLOW = ['your-pc.your-tailnet.ts.net', '/home/demo/', '-home-demo-', 'i@izs.me' /* an npm package author, public */];
@@ -84,13 +84,14 @@ if (i > 0) {
   for (const name of INCLUDE) {
     fs.cpSync(path.join(ROOT, name), path.join(DIR, name), { recursive: true, filter: src => !SKIP.has(path.basename(src)) });
   }
+  require('./build-site.js'); // the GitHub Pages site → DIR/docs, so the scan below covers it too
   report(scan(DIR), 'release/cc-watcher');
   const { version } = require(path.join(ROOT, 'package.json'));
   const zip = path.join(OUT, `cc-watcher-${version}.zip`);
   // bsdtar (Windows 10+, macOS) writes zips; elsewhere fall back to zip. On Windows name it outright, since Git's GNU
   // tar may come first on PATH and can't.
   const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
-  try { execFileSync(tar, ['-a', '-cf', zip, '--exclude', 'cc-watcher/.git', 'cc-watcher'], { cwd: OUT, stdio: 'pipe' }); }
-  catch { execFileSync('zip', ['-qr', zip, 'cc-watcher', '-x', 'cc-watcher/.git/*'], { cwd: OUT }); }
+  try { execFileSync(tar, ['-a', '-cf', zip, '--exclude', 'cc-watcher/.git', '--exclude', 'cc-watcher/docs', '--exclude', 'cc-watcher/site', 'cc-watcher'], { cwd: OUT, stdio: 'pipe' }); }
+  catch { execFileSync('zip', ['-qr', zip, 'cc-watcher', '-x', 'cc-watcher/.git/*', 'cc-watcher/docs/*', 'cc-watcher/site/*'], { cwd: OUT }); }
   console.log(`Release: ${path.relative(ROOT, zip)} (${(fs.statSync(zip).size / 1024).toFixed(0)} KB)`);
 }
