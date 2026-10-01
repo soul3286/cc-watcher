@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CC Watcher</title>
+<meta name="description" content="A live, animated dashboard for Claude Code. Clawd the mascot reacts to every step. Free fan project; reads local logs only.">
+<meta property="og:title" content="CC Watcher"><meta property="og:image" content="media/poster.jpg">
+<meta name="theme-color" content="#0d0a08">
+<style>
+  :root { --bg:#0d0a08; --panel:#15100d; --line:#2c221b; --fg:#f4e9dd; --dim:#b39a88; --accent:#ff8a3d; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 ui-monospace, Consolas, monospace; }
+  main { max-width:960px; margin:auto; padding:48px 16px; }
+  h1 { font-size:clamp(32px,6vw,56px); margin:0 0 8px; letter-spacing:-.02em; }
+  p { color:var(--dim); margin:0 0 24px; }
+  video { width:100%; border:3px solid rgba(255,138,61,.55); border-radius:14px; background:var(--panel); }
+  .btns { display:flex; flex-wrap:wrap; gap:12px; margin:28px 0; }
+  a.btn { background:var(--accent); color:var(--bg); padding:12px 18px; border-radius:8px; font-weight:700; text-decoration:none; }
+  a.btn.ghost { background:none; color:var(--accent); border:2px solid var(--accent); }
+  small { color:var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>CC Watcher</h1>
+  <p>A live, animated dashboard for Claude Code. Clawd reacts to every step: working, idle, done, errors, streaks and easter eggs. Runs on your own computer and only reads Claude Code's logs.</p>
+  <video src="media/showcase.mp4" poster="media/poster.jpg" controls playsinline preload="metadata"></video>
+  <div class="btns">
+    <a class="btn" href="https://github.com/soul3286/cc-watcher/releases/latest">Download</a>
+    <a class="btn ghost" href="https://github.com/soul3286/cc-watcher/blob/main/SETUP-GUIDE.md">Setup guide</a>
+    <a class="btn ghost" href="https://github.com/soul3286/cc-watcher">Source on GitHub</a>
+  </div>
+  <small>A free, non-commercial fan project. Not affiliated with Anthropic. Clawd, Claude and Claude Code are trademarks of Anthropic; the mascot art is not covered by the code's MIT licence.</small>
+</main>
+</body>
+</html>

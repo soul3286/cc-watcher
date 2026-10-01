@@ -92,7 +92,7 @@ If the phone loses the connection (the computer is asleep, the black window was 
 
 A small floating Clawd on your desktop, showing the most important thing across all your sessions.
 
-1. Download **`CC Live Setup 1.0.0.exe`** from the [Releases page](../../releases).
+1. Download **`CC.Live.Setup.1.0.0.exe`** from the [Releases page](../../releases).
 2. Run it. It isn't code-signed, so Windows SmartScreen asks once: click **More info → Run anyway**.
 3. Clawd appears on your desktop. The installer includes its own watcher, so you don't need the zip for it.
 

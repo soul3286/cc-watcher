@@ -37,7 +37,7 @@ function patterns() {
 
 function* files(p) {
   if (!fs.statSync(p).isDirectory()) return yield p;
-  for (const e of fs.readdirSync(p)) yield* files(path.join(p, e));
+  for (const e of fs.readdirSync(p)) if (e !== '.git') yield* files(path.join(p, e));
 }
 
 function scan(target) {
@@ -77,7 +77,10 @@ if (i > 0) {
   const t = path.resolve(process.argv[i + 1] ?? '');
   report(scan(t), t);
 } else {
-  fs.rmSync(OUT, { recursive: true, force: true });
+  // Clear the last build but keep release/cc-watcher/.git: the published GitHub repo's history lives there.
+  const clear = (dir, keep) => fs.existsSync(dir) && fs.readdirSync(dir).filter(e => e !== keep)
+    .forEach(e => fs.rmSync(path.join(dir, e), { recursive: true, force: true }));
+  clear(OUT, 'cc-watcher'); clear(DIR, '.git');
   for (const name of INCLUDE) {
     fs.cpSync(path.join(ROOT, name), path.join(DIR, name), { recursive: true, filter: src => !SKIP.has(path.basename(src)) });
   }
@@ -87,7 +90,7 @@ if (i > 0) {
   // bsdtar (Windows 10+, macOS) writes zips; elsewhere fall back to zip. On Windows name it outright, since Git's GNU
   // tar may come first on PATH and can't.
   const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
-  try { execFileSync(tar, ['-a', '-cf', zip, 'cc-watcher'], { cwd: OUT, stdio: 'pipe' }); }
-  catch { execFileSync('zip', ['-qr', zip, 'cc-watcher'], { cwd: OUT }); }
+  try { execFileSync(tar, ['-a', '-cf', zip, '--exclude', 'cc-watcher/.git', 'cc-watcher'], { cwd: OUT, stdio: 'pipe' }); }
+  catch { execFileSync('zip', ['-qr', zip, 'cc-watcher', '-x', 'cc-watcher/.git/*'], { cwd: OUT }); }
   console.log(`Release: ${path.relative(ROOT, zip)} (${(fs.statSync(zip).size / 1024).toFixed(0)} KB)`);
 }
