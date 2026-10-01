@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+progress.json
+*.log
+*.log.err
+release.private.json
+video/

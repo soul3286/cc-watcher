@@ -1,0 +1,44 @@
+MIT License — for the code only (see "What this licence does NOT cover" below)
+
+Copyright (c) 2026 cc-watcher contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+What this licence does NOT cover
+-------------------------------------------------------------------------------
+
+The MIT licence above applies only to the code written for this project. It
+does NOT apply to, and grants no rights in, the mascot artwork:
+
+  - everything in public/sprites/
+  - the app icons: public/icon-192.png, public/icon-512.png,
+    public/icon-maskable-512.png, public/apple-touch-icon.png,
+    electron/icon.png, electron/icon.ico
+
+None of this artwork was made by this project's author. Clawd, Claude and
+Claude Code are characters and trademarks of Anthropic; all rights in the
+mascot and its artwork belong to Anthropic and the original creators. The
+animated sprites were made with crashchen/cc-gifs
+(https://github.com/crashchen/cc-gifs), whose MIT licence likewise covers only
+its generator code, not the character.
+
+This is a free, non-commercial fan project, not affiliated with, endorsed by or
+sponsored by Anthropic. If you fork it, you can swap in your own art: put new
+pictures in public/sprites/ and point the names in public/sprites.js at them.

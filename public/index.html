@@ -1,0 +1,1975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Claude Code — Live</title>
+<link rel="icon" href="sprites/mascot-idle.png" data-pose="still">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0d0a08">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CC Live">
+<style>
+  :root {
+    --bg: #0d0a08;
+    --bg2: #15100d;
+    --bg3: #1b1511;
+    --line: #2c221b;
+    --text: #f2e4d8;
+    --dim: #8c7667;
+    --accent: #ff8a3d;
+    --edit: #ff8a3d;
+    --bash: #ffc53d;
+    --read: #ffa94d;
+    --other: #d6a482;
+    --error: #ff5147;
+    --sprite: 120px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+    height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+    background: repeating-linear-gradient(0deg, rgba(255,138,61,0.025) 0px, transparent 1px, transparent 2px);
+    mix-blend-mode: overlay;
+  }
+
+  /* --- top bar --- */
+  .topbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--bg2);
+  }
+  .topbar h1 { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin: 0; font-weight: 600; }
+  .topbar h1::before { content: '● '; color: var(--dim); }
+  body.live .topbar h1::before { color: var(--accent); animation: blink 1.6s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+  #stats { margin-left: auto; font-size: 10px; color: var(--dim); letter-spacing: .5px; }
+  #conn { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+  body.live #conn { color: var(--accent); }
+
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+  /* --- empty state --- */
+  #empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--dim); font-size: 12px; text-align: center; padding: 16px; }
+  #empty img { width: 96px; image-rendering: pixelated; opacity: .75; }
+  #empty[hidden], #grid[hidden], #dock[hidden] { display: none; }
+
+  /* --- session grid --- */
+  #grid {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px;
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+    grid-auto-rows: minmax(400px, 1fr);
+  }
+  .panel {
+    --tool: var(--accent);
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  }
+  .panel[data-tool=edit] { --tool: var(--edit); }
+  .panel[data-tool=bash] { --tool: var(--bash); }
+  .panel[data-tool=read] { --tool: var(--read); }
+  .panel[data-tool=other] { --tool: var(--other); }
+  .panel[data-state=error] { --tool: var(--error); border-color: color-mix(in srgb, var(--error) 45%, var(--line)); }
+  .panel[data-state=working] { border-color: color-mix(in srgb, var(--tool) 35%, var(--line)); }
+
+  .panel-head { display: flex; align-items: baseline; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--bg3); }
+  .proj { font-weight: 700; font-size: 12px; letter-spacing: .3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .sid { color: var(--dim); font-size: 10px; flex-shrink: 0; }
+  .badge { margin-left: auto; flex-shrink: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; padding: 1px 8px; border-radius: 99px; border: 1px solid currentColor; color: var(--dim); }
+  .panel:not([data-state=idle]) .badge { color: var(--tool); }
+
+  /* --- mascot stage --- */
+  .stage { position: relative; display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .mascot { position: relative; width: var(--sprite); height: var(--sprite); flex-shrink: 0; }
+  /* Two stacked layers: the incoming pose decodes on the hidden one, then they crossfade. */
+  .sprite { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; image-rendering: pixelated; transform-origin: 50% 78%; transition: opacity .22s cubic-bezier(.2,.8,.2,1); }
+  .sprite:not(.front) { opacity: 0; }
+  .glow {
+    position: absolute; left: 12%; right: 12%; top: 70%; height: 17%; border-radius: 50%;
+    background: radial-gradient(closest-side, var(--tool), transparent);
+    opacity: .28; filter: blur(3px); transition: opacity .3s;
+  }
+  .panel[data-state=idle] .sprite { animation: breathe 3.6s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(.99, 1.03); } }
+  .panel[data-state=working] .glow { opacity: .9; animation: glowPulse 1.1s ease-in-out infinite alternate; }
+  @keyframes glowPulse { to { opacity: .55; transform: scaleX(.9); } }
+  .panel[data-state=error] .glow { opacity: .8; }
+  .panel[data-state=error] .sprite { filter: drop-shadow(0 0 6px #ff514799); }
+  .panel[data-state=waiting] { --tool: var(--bash); border-color: color-mix(in srgb, var(--bash) 35%, var(--line)); }
+  .panel[data-state=done] { --tool: var(--accent); }
+  .panel[data-state=away] .glow { opacity: .1; }
+  .panel[data-state=away] .badge, .panel[data-state=away] .verb { color: var(--dim); }
+  .panel[data-state=asleep] .glow { opacity: .05; }
+  .panel[data-state=asleep] .badge, .panel[data-state=asleep] .verb { color: var(--dim); }
+  .panel[data-state=asleep] .sprite, .chip[data-state=asleep] img { filter: brightness(.8) saturate(.7); }
+  .mascot.shake { animation: shake .5s cubic-bezier(.36,.07,.19,.97); }
+  @keyframes shake {
+    15%, 55% { transform: translateX(-5px) rotate(-2deg); }
+    35%, 75% { transform: translateX(5px) rotate(2deg); }
+    90% { transform: translateX(-2px); }
+  }
+
+  .status { min-width: 0; flex: 1; }
+  .verb { color: var(--tool); font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+  .panel[data-state=idle] .verb { color: var(--dim); }
+  .detail { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .meta { margin-top: 7px; font-size: 10px; letter-spacing: .8px; text-transform: uppercase; color: var(--dim); }
+
+  /* --- per-session feed --- */
+  .feed { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding: 8px 14px 10px; list-style: none; }
+  .feed:empty::before { content: 'No activity yet.'; color: var(--dim); font-size: 12px; }
+  .ev { display: flex; gap: 10px; padding: 4px 0 4px 10px; font-size: 12px; line-height: 1.5; border-left: 2px solid var(--c, transparent); animation: popIn .32s cubic-bezier(.22,1,.36,1) both; transform-origin: 0 50%; transition: background-color .14s; }
+  @keyframes fadeIn { from { opacity: 0; } }
+  /* transform-only so the row's height lands instantly — no reflow while it slides in */
+  @keyframes popIn { from { opacity: 0; transform: translateX(-12px) scale(.97); } 40% { opacity: 1; } }
+  .ev .ico { flex-shrink: 0; width: 1.3em; text-align: center; font-size: 12px; }
+  .feed-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .newpill {
+    position: absolute; right: 14px; bottom: 10px; z-index: 2;
+    padding: 3px 10px; border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line)); border-radius: 99px;
+    background: color-mix(in srgb, var(--accent) 18%, var(--bg3)); color: var(--text);
+    font: inherit; font-size: 11px; cursor: pointer; box-shadow: 0 4px 14px #0008;
+    animation: popIn .26s cubic-bezier(.22,1,.36,1) both;
+  }
+  .newpill[hidden] { display: none; }
+  .newpill:hover { background: color-mix(in srgb, var(--accent) 30%, var(--bg3)); }
+  .newpill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* --- activity pulse meter --- */
+  .pulse { display: block; width: 100%; height: 16px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+
+  /* --- streak flavor text: floats over the mascot's head, clamped to the mascot column --- */
+  .cheer {
+    position: absolute; z-index: 3; left: 50%; top: 2px; width: max-content; max-width: calc(var(--sprite) + 16px);
+    padding: 3px 8px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+    background: color-mix(in srgb, var(--bg3) 88%, transparent); color: var(--text);
+    font-size: 10px; line-height: 1.35; text-align: center; pointer-events: none;
+    animation: cheer 2.5s ease-out both;
+  }
+  @keyframes cheer {
+    from { opacity: 0; transform: translate(-50%, 8px) scale(.9); }
+    12% { opacity: 1; transform: translate(-50%, 0) scale(1.04); }
+    18% { transform: translate(-50%, 0) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -2px); }
+    to { opacity: 0; transform: translate(-50%, -8px); }
+  }
+
+  #sound, #progressBtn, #creditsBtn, #demoBtn { background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--dim); font-size: 13px; line-height: 1; padding: 3px 7px; cursor: pointer; }
+  #sound[aria-pressed=true] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  #sound:focus-visible, #progressBtn:focus-visible, #creditsBtn:focus-visible, #demoBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* --- sheets (stats, event detail): centred dialog on desktop, bottom sheet on phones --- */
+  .sheet { background: var(--bg2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 0; width: min(520px, calc(100vw - 32px)); max-height: min(660px, calc(100dvh - 48px)); font: inherit; font-size: 12px; flex-direction: column; overflow: hidden; }
+  .sheet[open] { display: flex; }
+  .sheet > :not(.sheet-body) { flex-shrink: 0; } /* only the body scrolls; the tab bar is a scroller and would otherwise shrink to nothing */
+  .sheet::backdrop { background: rgb(0 0 0 / .55); }
+  .sheet-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 18px; border-bottom: 1px solid var(--line); background: var(--bg3); }
+  .sheet h2 { flex: 1; min-width: 0; margin: 0; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet-x { flex-shrink: 0; width: 32px; height: 32px; font: inherit; font-size: 14px; background: none; border: 1px solid transparent; border-radius: 6px; color: var(--dim); cursor: pointer; }
+  .sheet-x:hover { color: var(--text); border-color: var(--line); }
+  .tabs { display: flex; padding: 0 10px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .tabs button { flex: 1 0 auto; font: inherit; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--dim); padding: 9px 7px 7px; cursor: pointer; white-space: nowrap; }
+  .tabs button:hover { color: var(--text); }
+  .tabs [aria-selected=true] { color: var(--accent); border-bottom-color: var(--accent); }
+  .sheet-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 18px 4px; }
+  .sheet .note { color: var(--dim); margin: 0 0 12px; line-height: 1.5; }
+  .sheet .note:empty { display: none; }
+  #progressNote { margin: 0; padding: 0 18px; }
+  #progressNote:not(:empty) { padding-top: 8px; }
+  .sheet .actions { display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 10px 18px 14px; border-top: 1px solid var(--line); }
+  .sheet .actions button { font: inherit; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 5px 10px; cursor: pointer; }
+  .sheet .actions button:disabled { color: var(--dim); opacity: .5; cursor: default; }
+  .sheet .actions .spacer { flex: 1; }
+  .sheet button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sheet #progressReset { color: var(--dim); }
+  .sheet #progressReset[hidden] { display: none; }
+  .sheet #progressReset:hover { color: var(--error); border-color: color-mix(in srgb, var(--error) 50%, var(--line)); }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 5px 16px; margin: 0 0 14px; }
+  .kv dt { color: var(--dim); }
+  .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .sec { margin: 0 0 16px; }
+  .sec h3 { margin: 0 0 8px; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .live-line { margin: 0 0 12px; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .live-line.on { color: var(--accent); }
+  .live-line.off { color: var(--error); }
+  .big-count { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+  table.panes { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+  .panes th { font-weight: 400; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); text-align: right; padding: 0 0 4px; }
+  .panes td { text-align: right; padding: 5px 0; border-top: 1px solid var(--line); }
+  .panes th:first-child, .panes td.name { text-align: left; width: 34%; }
+  .panes td.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panes .docked { color: var(--dim); }
+  /* 7-day chart: segmented pixel bars; each day is a button */
+  .days { display: flex; gap: 4px; margin: 0 0 12px; }
+  .day { flex: 1; min-width: 0; min-height: 76px; display: flex; flex-direction: column; gap: 4px; padding: 4px 2px; font: inherit; font-size: 10px; color: var(--dim); background: none; border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
+  .day .col { flex: 1; display: flex; align-items: flex-end; justify-content: center; }
+  .day .bar { width: 55%; min-height: 2px; background: repeating-linear-gradient(to top, var(--dim) 0 3px, transparent 3px 4px); }
+  .day:hover { border-color: var(--line); }
+  .day[aria-pressed=true] { color: var(--text); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .day[aria-pressed=true] .bar { background: repeating-linear-gradient(to top, var(--accent) 0 3px, transparent 3px 4px); }
+  .achs, .secrets, .ctx { list-style: none; margin: 0 0 12px; padding: 0; }
+  .ach { display: grid; grid-template-columns: 12px 1fr auto; gap: 2px 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .ach .medal { grid-row: span 2; align-self: center; width: 10px; height: 10px; border: 2px solid var(--line); }
+  .ach.got .medal { background: var(--accent); border-color: var(--accent); box-shadow: 2px 2px 0 color-mix(in srgb, var(--accent) 35%, transparent); }
+  .ach.secret .medal { border-style: dashed; }
+  .ach b { font-size: 11px; letter-spacing: 1px; }
+  .ach:not(.got) b { color: var(--dim); }
+  .ach .desc { grid-column: 2 / 4; color: var(--dim); }
+  .ach time { grid-column: 3; grid-row: 1; }
+  .ach time, .secret-row time { color: var(--dim); font-size: 10px; white-space: nowrap; }
+  .secret-row { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .secret-row .star { color: var(--bash); }
+  .secret-row b { flex: 1; font-weight: 600; }
+  /* event detail */
+  .notable-why { margin: 0 0 10px; color: var(--bash); font-weight: 700; letter-spacing: .5px; }
+  .ev-text { margin: 0 0 12px; padding: 8px 10px; max-height: 32vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 12px; line-height: 1.5; background: var(--bg3); border-left: 2px solid var(--c, var(--line)); }
+  .ctx button { display: flex; gap: 8px; width: 100%; min-height: 34px; align-items: center; padding: 4px 8px; font: inherit; font-size: 11px; text-align: left; color: var(--text); background: none; border: 0; border-left: 2px solid var(--c, transparent); cursor: pointer; }
+  .ctx button:hover { background: color-mix(in srgb, var(--c, var(--accent)) 8%, transparent); }
+  .ctx button.cur { background: color-mix(in srgb, var(--accent) 14%, transparent); cursor: default; }
+  .ctx .time { color: var(--dim); font-size: 10px; flex-shrink: 0; }
+  .ctx .tag { flex-shrink: 0; color: var(--c, var(--dim)); font-weight: 600; font-size: 10px; }
+  .ctx .txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
+  :is(.ctx button, .ev-text)[data-group=edit] { --c: var(--edit); }
+  :is(.ctx button, .ev-text)[data-group=bash] { --c: var(--bash); }
+  :is(.ctx button, .ev-text)[data-group=read] { --c: var(--read); }
+  :is(.ctx button, .ev-text)[data-group=other] { --c: var(--other); }
+  :is(.ctx button, .ev-text)[data-group=err] { --c: var(--error); }
+  :is(.ctx button, .ev-text)[data-group=done] { --c: var(--accent); }
+  .ev[data-group=edit] { --c: var(--edit); }
+  .ev[data-group=bash] { --c: var(--bash); }
+  .ev[data-group=read] { --c: var(--read); }
+  .ev[data-group=other] { --c: var(--other); }
+  .ev[data-group=err] { --c: var(--error); }
+  .ev[data-group=done] { --c: var(--accent); }
+  .ev .time { color: var(--dim); flex-shrink: 0; font-size: 10px; padding-top: 1px; }
+  .ev .tag { flex-shrink: 0; height: fit-content; padding: 0 6px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .5px; color: var(--c, var(--dim)); background: color-mix(in srgb, var(--c, #fff) 13%, transparent); }
+  .ev .body { overflow-wrap: anywhere; min-width: 0; }
+  .ev[data-group=ok] .body, .ev[data-group=text] .body { color: var(--dim); }
+  .ev[data-group=text] .body { font-style: italic; }
+
+  /* --- collapsed idle sessions --- */
+  #dock { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--bg2); }
+  #dock .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--dim); margin-right: 4px; }
+  #dockList { display: contents; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+    padding: 4px 12px 4px 6px; border: 1px solid var(--line); border-radius: 99px;
+    background: var(--bg3); color: var(--text); font: inherit; font-size: 12px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .chip:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--bg3)); }
+  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chip img { width: 28px; height: 28px; image-rendering: pixelated; }
+  .chip .proj { font-size: 12px; }
+  .chip .idle { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+  .chip[data-pinned=true] .proj::before { content: '★ '; color: var(--accent); }
+
+  /* --- hover & press: small, quick, never layout-shifting --- */
+  .panel { transition: border-color .14s, box-shadow .14s, translate .14s cubic-bezier(.2,.8,.2,1), opacity .2s, filter .2s; }
+  .panel:hover { translate: 0 -1px; box-shadow: 0 6px 18px #0007; border-color: color-mix(in srgb, var(--tool) 22%, var(--line)); }
+  .ev:hover { background: color-mix(in srgb, var(--c, var(--accent)) 8%, transparent); }
+  .mascot { cursor: pointer; }
+  .mascot:hover .glow { opacity: .5; }
+  .panel[data-state=working] .mascot:hover .glow { opacity: 1; }
+  .badge { cursor: default; }
+  :where(button, .mascot) { transition: scale .08s cubic-bezier(.2,.8,.2,1); }
+  :where(button, .mascot):active { scale: .96; }
+
+  /* --- panel head: tick LED, combo, pin/rename/focus --- */
+  .led { width: 5px; height: 5px; flex-shrink: 0; align-self: center; background: var(--tool); opacity: .18; }
+  .panel[data-state=idle] .led, .panel[data-state=away] .led, .panel[data-state=asleep] .led { background: var(--dim); }
+  .acts { display: flex; gap: 2px; flex-shrink: 0; align-self: center; margin-left: auto; opacity: 0; transition: opacity .14s; }
+  .panel-head .badge { margin-left: 0; }
+  .panel:hover .acts, .panel:focus-within .acts, .panel[data-pinned=true] .acts, .panel.focused .acts { opacity: 1; }
+  .panel[data-pinned=true]:not(:hover):not(:focus-within):not(.focused) .act:not(.pin) { visibility: hidden; }
+  @media (hover: none) { .acts { opacity: 1; } }
+  .act { font: inherit; font-size: 12px; line-height: 1; padding: 2px 4px; background: none; border: 1px solid transparent; border-radius: 4px; color: var(--dim); cursor: pointer; }
+  .act:hover { color: var(--text); border-color: var(--line); }
+  .act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .act.pin[aria-pressed=true], .act.focus[aria-pressed=true] { color: var(--accent); }
+  .nick-input { font: inherit; font-size: 12px; font-weight: 700; min-width: 0; flex: 0 1 180px; padding: 0 4px; color: var(--text); background: var(--bg2); border: 1px solid var(--accent); border-radius: 3px; outline: none; }
+  .combo { position: relative; flex-shrink: 0; font-size: 10px; font-weight: 700; letter-spacing: .5px; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); color: var(--dim); }
+  .combo[hidden] { display: none; }
+  .combo[data-lvl="2"], .combo[data-lvl="3"] { color: var(--accent); }
+  .combo[data-lvl="3"] { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  .combo[data-lvl="4"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  .combo[data-lvl="5"] { color: var(--bg); background: var(--bash); border-color: var(--bash); outline: 1px solid var(--bash); outline-offset: 1px; }
+
+  /* --- effects: pixel particles and fireworks stay inside the mascot stage, never over the feed --- */
+  .px { position: absolute; z-index: 4; pointer-events: none; }
+  .fx { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
+  .cheer.big { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--bg3)); font-weight: 700; letter-spacing: .4px; }
+  .cheer.rare { border-color: var(--bash); background: color-mix(in srgb, var(--bash) 18%, var(--bg3)); color: var(--bash); font-weight: 700; }
+  .cheer.say { border-color: var(--line); background: var(--bg3); color: var(--text); font-style: italic; }
+  .topbar { position: relative; }
+  .topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--accent); scale: 0 1; transform-origin: 0 50%; opacity: 0; pointer-events: none; }
+  .topbar.sweep::after { animation: sweep .9s cubic-bezier(.2,.8,.2,1); }
+  @keyframes sweep { 0% { scale: 0 1; opacity: 1; } 70% { scale: 1 1; opacity: 1; } 100% { scale: 1 1; opacity: 0; } }
+  #note { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); opacity: 0; transition: opacity .3s; }
+  #note.show { opacity: 1; }
+  #note.rare { color: var(--bash); font-weight: 700; }
+
+  /* --- focus mode: one pane dominant, the rest recede into a side column --- */
+  #focusBar { font: inherit; font-size: 11px; padding: 3px 10px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); background: color-mix(in srgb, var(--accent) 12%, var(--bg3)); color: var(--text); cursor: pointer; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #focusBar[hidden] { display: none; }
+  #focusBar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #grid.focusing { grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr); grid-auto-rows: minmax(170px, 1fr); }
+  #grid.focusing.solo { grid-template-columns: minmax(0, 1fr); }
+  #grid.focusing .panel.focused { grid-column: 1; grid-row: 1 / span var(--n, 1); --sprite: 150px; border-color: color-mix(in srgb, var(--tool) 40%, var(--line)); }
+  #grid.focusing .panel.focused .ev { font-size: 13px; }
+  #grid.focusing .panel:not(.focused) .sid { display: none; }
+  #grid.focusing .panel:not(.focused) { grid-column: 2; --sprite: 64px; opacity: .45; filter: saturate(.55); }
+  #grid.focusing .panel:not(.focused):hover, #grid.focusing .panel:not(.focused):focus-within { opacity: .85; filter: none; }
+  @media (max-width: 760px) {
+    #grid.focusing { grid-template-columns: minmax(0, 1fr); }
+    #grid.focusing .panel:not(.focused) { display: none; }
+  }
+
+  /* --- sky: rare pixel visitors crossing the dashboard; never red, never glitchy, so never mistaken for an error --- */
+  #sky { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+  .sprite-px { position: absolute; left: 0; top: 0; width: 3px; height: 3px; }
+  .ufo { pointer-events: auto; cursor: pointer; }
+
+  /* Collapse/expand morph: snapshots stay unscaled and clip to the moving box, so a panel folds into its header row. */
+  ::view-transition-group(*) { animation-duration: .38s; animation-timing-function: cubic-bezier(.2,.8,.2,1); overflow: clip; }
+  ::view-transition-old(*), ::view-transition-new(*) { width: 100%; height: 100%; object-fit: none; object-position: 0 0; }
+  @supports not (view-transition-name: none) {
+    .panel, .chip { animation: fadeIn .3s both; }
+  }
+
+  @media (max-width: 480px) {
+    :root { --sprite: 88px; }
+    .topbar, #grid, #dock { padding-left: 16px; padding-right: 16px; }
+    #stats { margin-left: 0; width: 100%; order: 3; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .panel[data-state=idle] .sprite, .panel[data-state=working] .glow, .mascot.shake, .ev, .newpill, body.live .topbar h1::before, .topbar.sweep::after { animation: none; }
+    .panel, .panel:hover { translate: none; }
+    .sprite { transition: none; }
+    .cheer { animation-name: fadeOut; }
+    @keyframes fadeOut { from, 80% { opacity: 1; transform: translateX(-50%); } to { opacity: 0; transform: translateX(-50%); } }
+    ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 0s; }
+  }
+
+  /* --- phone / installed app. env() insets are 0 on desktop, so none of this changes the desktop layout. --- */
+  html { touch-action: manipulation; } /* no double-tap zoom: a double-tap on the mascot is an easter egg */
+  body { padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .topbar { padding-top: max(10px, env(safe-area-inset-top)); }
+
+  /* --- disconnected: the last known state stays visible but visibly frozen, never passed off as live --- */
+  #offline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 16px; font-size: 11px; line-height: 1.5;
+    background: color-mix(in srgb, var(--error) 12%, var(--bg2)); border-bottom: 1px solid color-mix(in srgb, var(--error) 45%, var(--line)); }
+  #offline[hidden] { display: none; }
+  #offline img { width: 32px; image-rendering: pixelated; }
+  #offline .msg { flex: 1; min-width: 200px; }
+  #offline b { color: var(--error); letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-right: 6px; }
+  #offline .hint { color: var(--dim); }
+  #offline button { font: inherit; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 5px 10px; cursor: pointer; }
+  body.offline #conn { color: var(--error); }
+  body.offline #grid, body.offline #dock, body.offline #empty { filter: grayscale(.9); opacity: .45; }
+  body.offline .panel, body.offline .panel * { animation-play-state: paused !important; }
+
+  @media (hover: none) {
+    .panel:hover { translate: none; }
+    /* pinned panes hide nick/focus until hover on desktop; touch has no hover, so keep them reachable */
+    .panel[data-pinned=true]:not(:hover):not(:focus-within):not(.focused) .act:not(.pin) { visibility: visible; }
+  }
+  @media (pointer: coarse) {
+    .act { min-width: 36px; min-height: 36px; font-size: 15px; }
+    #sound, #progressBtn, #creditsBtn, #demoBtn { min-width: 44px; min-height: 40px; font-size: 16px; }
+    #focusBar, #offline button, #progressDlg .actions button { min-height: 40px; }
+    .chip { min-height: 44px; }
+    .newpill { padding: 8px 14px; }
+  }
+  @media (max-width: 480px) {
+    .topbar { gap: 6px 10px; }
+    .topbar h1 { letter-spacing: 1px; }
+    #grid { grid-auto-rows: minmax(360px, auto); }
+    #grid.focusing { grid-auto-rows: minmax(0, 1fr); }
+  }
+
+  /* --- event exploration: rows open a detail sheet; notable ones carry a gold tick --- */
+  .ev { cursor: pointer; }
+  .ev.sel { background: color-mix(in srgb, var(--accent) 14%, transparent); outline: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); outline-offset: -1px; }
+  .ev.notable { border-left-color: var(--bash); }
+  .ev.notable .tag::after { content: ' ✦'; color: var(--bash); }
+  .feed:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* --- dashboard energy: 4-cell meter; the level also tunes the ambient motes, the live blink and transitions --- */
+  #energy { display: inline-flex; align-items: center; gap: 2px; padding: 3px 7px; font: inherit; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); background: none; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+  #energy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #energy i { width: 4px; height: 9px; background: var(--line); transition: background .6s; }
+  #energy b { margin-left: 5px; min-width: 7ch; text-align: left; font-weight: 600; }
+  #energy[data-level="0"] i:nth-of-type(-n+1), #energy[data-level="1"] i:nth-of-type(-n+2),
+  #energy[data-level="2"] i:nth-of-type(-n+3) { background: var(--accent); }
+  #energy[data-level="3"] i { background: var(--bash); }
+  #energy:not([data-level="-1"]) b { color: var(--text); }
+  #energy[data-level="3"] b { color: var(--bash); }
+  html[data-energy=active] body.live .topbar h1::before { animation-duration: 1.3s; }
+  html[data-energy=busy] body.live .topbar h1::before { animation-duration: 1s; }
+  html[data-energy=chaotic] body.live .topbar h1::before { animation-duration: .7s; }
+  html[data-energy=busy]::view-transition-group(*) { animation-duration: .3s; }
+  html[data-energy=chaotic]::view-transition-group(*) { animation-duration: .24s; }
+  #motes { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+  #motes i { position: absolute; bottom: -6px; width: 3px; height: 3px; background: var(--accent); animation: drift linear infinite; }
+  @keyframes drift { to { transform: translate(24px, -105vh); } }
+  body.offline #motes { display: none; }
+
+  /* --- session replay: its own window, striped and labelled so it can never pass for live --- */
+  #replayBtn { background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--dim); font-size: 13px; line-height: 1; padding: 3px 7px; cursor: pointer; }
+  #demoBtn { font-size: 11px; letter-spacing: .5px; white-space: nowrap; }
+  .credits p { margin: 0 0 10px; line-height: 1.5; }
+  .credits a { color: var(--accent); }
+  #replayBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sheet.replay { width: min(860px, calc(100vw - 32px)); height: min(760px, calc(100dvh - 48px)); max-height: none; border-style: dashed; border-color: color-mix(in srgb, var(--read) 55%, var(--line)); }
+  .rp-player { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .rp-player[hidden], #rpPick[hidden] { display: none; }
+  .rp-banner { margin: 0; padding: 6px 18px; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--read);
+    background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--read) 14%, transparent) 0 6px, transparent 6px 12px); border-bottom: 1px solid var(--line); }
+  .rp-banner b { color: var(--text); margin-right: 6px; }
+  .rp-stage { display: flex; align-items: center; gap: 16px; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+  .rp-mascot { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+  .rp-sprite { width: 100%; height: 100%; image-rendering: pixelated; filter: sepia(.55) saturate(.8); }
+  .rp-stage .verb { color: var(--read); }
+  .rp-feed { flex: 1; min-height: 0; }
+  .rp-feed.quiet .ev { animation: none; }
+  .rp-feed .ev { cursor: default; }
+  .rp-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 18px 4px; border-top: 1px solid var(--line); }
+  .rp-controls button { font: inherit; font-size: 11px; background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--text); padding: 5px 10px; cursor: pointer; }
+  #rpPlay { min-width: 44px; font-size: 13px; }
+  #rpScrub { flex: 1 1 200px; min-width: 0; accent-color: var(--read); }
+  .rp-time { font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rp-speeds { display: flex; gap: 2px; }
+  .rp-speeds [aria-pressed=true] { color: var(--bg); background: var(--read); border-color: var(--read); }
+  .rp-note { margin: 0; padding: 4px 18px 12px; font-size: 10px; color: var(--dim); }
+  .rp-list { list-style: none; margin: 0 0 12px; padding: 0; }
+  .rp-list button { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; width: 100%; padding: 8px 10px; text-align: left; font: inherit; font-size: 12px; color: var(--text); background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .rp-list button:hover { background: color-mix(in srgb, var(--read) 8%, transparent); }
+  .rp-list .when, .rp-list .size { color: var(--dim); font-size: 10px; }
+  .rp-list .size { text-align: right; }
+  .rp-list .livetag { color: var(--accent); font-size: 10px; letter-spacing: 1px; margin-left: 6px; }
+  .rp-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* --- pane reordering --- */
+  .act.grip { cursor: grab; touch-action: none; }
+  .act.grip[hidden], #grid.focusing .act.grip { display: none; }
+  .panel.pressing .panel-head { background: color-mix(in srgb, var(--accent) 12%, var(--bg3)); transition: background .45s; }
+  .panel.dragging { position: relative; z-index: 30; transition: none; cursor: grabbing; border-color: var(--accent); outline: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 3px; box-shadow: 0 16px 34px #000b; }
+  body.reordering, body.reordering * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #motes { display: none; }
+    #energy i { transition: none; }
+  }
+  /* Phone: four 44px pane buttons leave the project name no room, so they take their own row under it. */
+  @media (max-width: 480px) and (pointer: coarse) {
+    .panel-head { flex-wrap: wrap; row-gap: 2px; padding-bottom: 4px; }
+    .panel-head .sid { margin-right: auto; }
+    .acts { order: 9; flex-basis: 100%; justify-content: flex-end; margin-left: 0; }
+  }
+  @media (max-width: 600px) {
+    .sheet { width: 100%; max-width: 100%; max-height: 88dvh; margin: auto 0 0; border-radius: 12px 12px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+    .sheet[open] { animation: sheetUp .26s cubic-bezier(.2,.8,.2,1); }
+    .sheet.replay { width: 100%; height: 100dvh; border-radius: 0; border-width: 0; padding-top: env(safe-area-inset-top); }
+    @keyframes sheetUp { from { transform: translateY(28px); opacity: 0; } }
+  }
+  @media (pointer: coarse) {
+    .sheet-x { width: 44px; height: 44px; font-size: 16px; }
+    #replayBtn { min-width: 44px; min-height: 40px; font-size: 16px; }
+    .rp-controls button { min-height: 44px; min-width: 44px; }
+    #rpScrub { min-height: 44px; }
+    .rp-list button { min-height: 52px; }
+    .tabs button { min-height: 44px; }
+    .sheet .actions button { min-height: 44px; }
+    .day { min-height: 88px; }
+    .ctx button { min-height: 44px; }
+    .ev { min-height: 44px; align-items: center; }
+    .act.grip { min-width: 44px; min-height: 44px; }
+    #energy { min-height: 44px; }
+    .panel-head { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  }
+
+  /* --- Tier 3 toys: games live inside a pane's mascot strip (never over the feed); every target is 44px --- */
+  .toy-game, .toy-sticker { position: absolute; z-index: 5; }
+  .toy-target, .toy-sticker { width: 44px; height: 44px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center; touch-action: manipulation; }
+  .toy-target:focus-visible, .toy-sticker:focus-visible, .toy-strip button:focus-visible, .toybox button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .toy-px { width: 8px; height: 8px; background: var(--bash); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bash) 30%, transparent), 0 0 10px var(--bash); animation: toyBlink 1s steps(2) infinite; }
+  .toy-target.catch .toy-px { animation: none; }
+  @keyframes toyBlink { 50% { opacity: .35; } }
+  .toy-strip { left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 2px; flex-wrap: wrap; padding: 2px 4px;
+    background: color-mix(in srgb, var(--bg2) 92%, transparent); border-top: 1px solid var(--line); }
+  .toy-label { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); margin-right: 4px; }
+  .toy-strip button { font: inherit; min-width: 44px; min-height: 44px; background: none; border: 1px solid transparent; border-radius: 6px; color: var(--text); cursor: pointer; display: grid; place-items: center; touch-action: manipulation; }
+  .toy-strip .toy-x { color: var(--dim); font-size: 12px; }
+  .toy-bug.reveal { border-color: var(--bash); }
+  .toy-strip .toy-react { flex: 0 1 200px; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; border-color: var(--line); background: var(--bg3); }
+  .toy-strip .toy-react[data-phase=wait] { color: var(--dim); }
+  .toy-strip .toy-react[data-phase=go] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .toy-prop { position: absolute; right: -14px; top: 18%; z-index: 5; pointer-events: none; }
+  .toybox { position: absolute; top: calc(100% + 4px); left: 12px; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; max-width: calc(100vw - 24px);
+    padding: 6px; background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / .45); }
+  .toybox .toy-label { width: 100%; margin: 0 0 2px 4px; }
+  .toybox .toy { font: inherit; min-width: 56px; min-height: 48px; padding: 4px 6px; background: none; border: 1px solid transparent; border-radius: 6px; color: var(--text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .toybox .toy:hover { border-color: var(--line); background: var(--bg3); }
+  .toybox .ico { font-size: 16px; line-height: 1; }
+  .toybox .lbl { font-size: 9px; letter-spacing: .8px; text-transform: uppercase; color: var(--dim); }
+  .topbar h1[role=button] { cursor: pointer; }
+  .topbar h1[role=button]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  .toy-confetti { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 45; pointer-events: none; image-rendering: pixelated; }
+  .bingo { display: grid; gap: 4px; max-width: 360px; margin: 4px 0 6px; }
+  .bingo-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .bingo-cell { min-height: 52px; display: grid; place-items: center; text-align: center; padding: 4px; font-size: 10px; letter-spacing: .8px; line-height: 1.3;
+    border: 1px dashed var(--line); border-radius: 6px; color: var(--dim); }
+  .bingo-cell.hit { border-style: solid; border-color: var(--accent); color: var(--bg); background: var(--accent); font-weight: 700; }
+  .doodle-body { display: grid; gap: 10px; }
+  #doodlePad { width: 100%; max-width: 480px; aspect-ratio: 4 / 3; image-rendering: pixelated; border: 1px solid var(--line); border-radius: 6px; touch-action: none; cursor: crosshair; background: var(--bg); }
+  .doodle-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  #doodleInks { display: flex; gap: 4px; }
+  .ink { width: 44px; height: 44px; border-radius: 6px; border: 2px solid var(--line); background: var(--ink); color: var(--text); font: inherit; cursor: pointer; }
+  .ink[aria-pressed=true] { border-color: var(--text); }
+  #doodleClear { font: inherit; font-size: 11px; min-height: 44px; padding: 0 14px; background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--text); cursor: pointer; }
+  @media (pointer: coarse) { .topbar h1[role=button] { min-height: 44px; display: flex; align-items: center; } }
+  @media (prefers-reduced-motion: reduce) { .toy-px { animation: none; } }
+</style>
+</head>
+<body>
+  <div id="motes" aria-hidden="true"></div>
+  <header class="topbar">
+    <h1>Claude Code · Live</h1>
+    <span id="note" role="status" aria-live="polite"></span>
+    <button id="focusBar" type="button" hidden title="Back to all sessions (Esc)">← All sessions</button>
+    <span id="stats">0 active · 0 idle · 0 events</span>
+    <button id="energy" type="button" data-level="-1"><i></i><i></i><i></i><i></i><b>—</b></button>
+    <span id="conn">connecting…</span>
+    <button id="sound" type="button" aria-pressed="false" title="Sound off" aria-label="Sound">🔈</button>
+    <button id="replayBtn" type="button" title="Replay a recorded session" aria-label="Replay a recorded session" aria-haspopup="dialog">⏮</button>
+    <button id="progressBtn" type="button" title="Stats, records, achievements & secrets" aria-label="Stats and progress" aria-haspopup="dialog">🏆</button>
+    <button id="creditsBtn" type="button" title="Credits" aria-label="Credits" aria-haspopup="dialog">ⓘ</button>
+  </header>
+  <div id="offline" role="alert" hidden>
+    <img data-pose="away" alt="">
+    <span class="msg"><b>Can't reach the watcher</b><span id="offlineWhen"></span> <span class="hint" id="offlineHint"></span></span>
+    <button id="offlineRetry" type="button">Retry now</button>
+  </div>
+  <dialog id="progressDlg" class="sheet" aria-labelledby="progressTitle">
+    <header class="sheet-head">
+      <h2 id="progressTitle">Stats</h2>
+      <button class="sheet-x" type="button" aria-label="Close">✕</button>
+    </header>
+    <nav class="tabs" role="tablist" aria-label="Stats views">
+      <button type="button" role="tab" data-tab="session" aria-controls="sheetBody">Session</button>
+      <button type="button" role="tab" data-tab="today" aria-controls="sheetBody">Today</button>
+      <button type="button" role="tab" data-tab="records" aria-controls="sheetBody">Records</button>
+      <button type="button" role="tab" data-tab="achievements" aria-controls="sheetBody">Badges</button>
+      <button type="button" role="tab" data-tab="secrets" aria-controls="sheetBody">Secrets</button>
+      <button type="button" role="tab" data-tab="games" aria-controls="sheetBody">Games</button>
+    </nav>
+    <div class="sheet-body" id="sheetBody" role="tabpanel" tabindex="0"></div>
+    <p id="progressNote" class="note" role="status"></p>
+    <form method="dialog" class="actions">
+      <button id="progressReset" type="button">Reset progress…</button>
+      <span class="spacer"></span>
+      <button type="submit" autofocus>Close</button>
+    </form>
+  </dialog>
+  <dialog id="creditsDlg" class="sheet" aria-labelledby="creditsTitle">
+    <header class="sheet-head">
+      <h2 id="creditsTitle">Credits</h2>
+      <button class="sheet-x" type="button" aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body credits" tabindex="0">
+      <p><b>A free, non-commercial fan project.</b> Not affiliated with, endorsed by or sponsored by Anthropic.</p>
+      <p><b>Clawd</b>, <b>Claude</b> and <b>Claude Code</b> are characters and trademarks of Anthropic. All rights to the mascot and its artwork belong to Anthropic and the original creators.</p>
+      <p>The animated mascot sprites were made with <a href="https://github.com/crashchen/cc-gifs" target="_blank" rel="noopener">crashchen/cc-gifs</a> (MIT-licensed generator code; the licence covers the code, not the character). None of the sprites were drawn by this project's author.</p>
+      <p>If you made any of this art and want it credited differently or removed, please open an issue: <a href="https://github.com/soul3286/cc-watcher/issues" target="_blank" rel="noopener">github.com/soul3286/cc-watcher/issues</a></p>
+      <p class="note">To use your own art, put new pictures in <code>public/sprites/</code> and point the names in <code>public/sprites.js</code> at them.</p>
+    </div>
+  </dialog>
+  <dialog id="replayDlg" class="sheet replay" aria-labelledby="replayTitle">
+    <header class="sheet-head">
+      <button id="rpBack" class="sheet-x rp-back" type="button" aria-label="Back to recordings" hidden>←</button>
+      <h2 id="replayTitle">Replay</h2>
+      <button class="sheet-x" type="button" aria-label="Close">✕</button>
+    </header>
+    <div id="rpPick" class="sheet-body"></div>
+    <div id="rpPlayer" class="rp-player" hidden>
+      <p class="rp-banner"><b>▶ REPLAY</b> <span id="rpWhen"></span></p>
+      <div class="rp-stage">
+        <div class="rp-mascot"><img class="rp-sprite" data-pose="idle" alt=""></div>
+        <div class="status">
+          <div class="verb" id="rpVerb">Ready</div>
+          <div class="detail" id="rpDetail">press play</div>
+          <div class="meta" id="rpClock"></div>
+        </div>
+      </div>
+      <ol class="feed rp-feed" id="rpFeed" aria-label="Replayed events"></ol>
+      <div class="rp-controls">
+        <button id="rpPlay" type="button" aria-label="Play">▶</button>
+        <input id="rpScrub" type="range" min="0" max="1" step="1" value="0" aria-label="Replay position">
+        <span id="rpTime" class="rp-time"></span>
+        <div class="rp-speeds" role="group" aria-label="Speed">
+          <button type="button" data-speed="0.5">0.5×</button><button type="button" data-speed="1">1×</button><button type="button" data-speed="2">2×</button><button type="button" data-speed="4">4×</button>
+        </div>
+      </div>
+      <p class="rp-note">Pauses longer than 3s are shortened. Replays play silently and never count toward progress.</p>
+    </div>
+  </dialog>
+  <dialog id="eventDlg" class="sheet" aria-labelledby="eventTitle">
+    <header class="sheet-head">
+      <h2 id="eventTitle">Event</h2>
+      <button class="sheet-x" type="button" aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body" id="eventBody" tabindex="0"></div>
+    <div class="actions">
+      <button id="evPrev" type="button" aria-label="Older event">↑ Older</button>
+      <button id="evReplay" type="button">↺ Replay effect</button>
+      <button id="evNext" type="button" aria-label="Newer event">Newer ↓</button>
+    </div>
+  </dialog>
+  <dialog id="doodleDlg" class="sheet" aria-labelledby="doodleTitle">
+    <header class="sheet-head">
+      <h2 id="doodleTitle">Doodle</h2>
+      <button class="sheet-x" type="button" aria-label="Close">✕</button>
+    </header>
+    <div class="sheet-body doodle-body">
+      <canvas id="doodlePad" aria-label="Pixel doodle pad — draw with mouse, finger or pen"></canvas>
+      <div class="doodle-tools">
+        <div id="doodleInks" role="group" aria-label="Ink"></div>
+        <button id="doodleClear" type="button">Clear</button>
+      </div>
+      <p class="note">Only the pad draws, so the page still scrolls. Doodles aren't saved.</p>
+    </div>
+  </dialog>
+  <main>
+    <div id="empty">
+      <img data-pose="still" alt="">
+      <div>Waiting for Claude Code activity…<br>Each session gets its own panel as soon as it does something.</div>
+    </div>
+    <section id="grid" hidden></section>
+    <section id="dock" hidden><span class="label">Idle</span><div id="dockList"></div></section>
+  </main>
+  <div id="sky" aria-hidden="true"></div>
+
+  <template id="panelTpl">
+    <article class="panel" data-state="idle">
+      <header class="panel-head">
+        <span class="proj"></span><span class="sid"></span>
+        <span class="acts">
+          <button class="act grip" type="button" hidden title="Move pane — drag, or use arrow keys" aria-label="Move pane (arrow keys)">⠿</button>
+          <button class="act focus" type="button" aria-pressed="false" title="Focus this session">⤢</button>
+          <button class="act nick" type="button" title="Nickname this project">✎</button>
+          <button class="act pin" type="button" aria-pressed="false" title="Pin project to the top">☆</button>
+        </span>
+        <span class="combo" hidden></span><span class="led" aria-hidden="true"></span><span class="badge">idle</span>
+      </header>
+      <canvas class="pulse" aria-hidden="true"></canvas>
+      <div class="stage">
+        <div class="mascot"><div class="glow"></div><img class="sprite front" data-pose="idle" alt=""><img class="sprite" data-pose="idle" alt=""></div>
+        <div class="status" aria-live="polite">
+          <div class="verb">Idle</div>
+          <div class="detail">waiting for activity…</div>
+          <div class="meta">0 events</div>
+        </div>
+      </div>
+      <div class="feed-wrap">
+        <ol class="feed"></ol>
+        <button class="newpill" type="button" hidden></button>
+      </div>
+    </article>
+  </template>
+  <template id="chipTpl">
+    <button class="chip" type="button"><img data-pose="still" alt=""><span class="proj"></span><span class="sid"></span><span class="idle">idle</span></button>
+  </template>
+
+<script src="demo.js"></script>
+<script src="progress.js"></script>
+<script src="sprites.js"></script>
+<script src="deep.js"></script>
+<script src="toys.js"></script>
+<script>
+const COLLAPSE_AFTER_MS = 90_000;
+const LINGER_MS = 2500;  // keep the claw animation going briefly between back-to-back tool calls
+const ERROR_MS = 3500;
+const MAX_ROWS = 250;
+const SRC = CCW_SPRITES.pose; // public/sprites.js
+// Static pictures in the markup (templates included) name a pose rather than a file.
+for (const r of [document, ...[...document.querySelectorAll('template')].map(t => t.content)])
+  for (const e of r.querySelectorAll('[data-pose]')) e[e.tagName === 'LINK' ? 'href' : 'src'] = SRC[e.dataset.pose];
+const SOCCER_ODDS = 0.12;      // chance each fresh idle spell shows the soccer variant instead of headphones
+const WAIT_AFTER_MS = 8000;    // no result this long on a tool that can prompt → probably waiting on approval
+const AWAY_AFTER_MS = 45_000;  // idle/done this long → asleep (panels still dock at COLLAPSE_AFTER_MS)
+// Long quiet → deep sleep. Per-device setting in localStorage `ccw.sleepAfterMin` (minutes, 0 = never), kept out of
+// progress.json so the synced format stays unchanged.
+const SLEEP_AFTER_MIN = 30;
+function sleepAfterMs() {
+  let v = NaN;
+  try { v = parseFloat(localStorage.getItem('ccw.sleepAfterMin') ?? ''); } catch {}
+  return (Number.isFinite(v) && v >= 0 ? v : SLEEP_AFTER_MIN) * 60_000;
+}
+const asleepPose = () => (reduceMotion() ? SRC.asleepStill : SRC.asleep);
+const NEVER_PROMPTS = new Set(['Read', 'Grep', 'Glob', 'Task', 'Agent', 'TodoWrite']);
+
+// --- easter eggs: short pose takeovers; the state pose resumes when they end ---
+const EGGS = CCW_SPRITES.egg;
+const EGG_BASH = [
+  { re: /\bgit\s+push\b/, egg: 'juggling', msg: '🚀 pushed!', onSuccess: true },
+  { re: /\b(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|jest|vitest|pytest|mocha|go\s+test|cargo\s+test)\b/, egg: 'happy', msg: '✅ tests passed', onSuccess: true },
+  { re: /\brm\s+-(?:\w*r\w*f|\w*f\w*r)\b/, egg: 'dizzy', msg: '😵 rm -rf?!' },
+];
+const WIZARD_EVERY = 100;                      // tool calls
+const HEAT = { n: 15, ms: 30_000, cooldown: 60_000 };
+// Holiday windows mirror clawd-on-desk's (month, first day, last day).
+const HOLIDAYS = [
+  { hat: 'pumpkin', ranges: [[10, 28, 31], [11, 1, 1]] },
+  { hat: 'santa', ranges: [[12, 22, 27]] },
+  { hat: 'party', ranges: [[12, 31, 31], [1, 1, 2]] },
+];
+const holidayHat = (d = new Date()) =>
+  HOLIDAYS.find(h => h.ranges.some(([m, a, b]) => d.getMonth() + 1 === m && d.getDate() >= a && d.getDate() <= b))?.hat;
+const lateNight = () => new Date().getHours() < 5;
+
+function idlePose() {
+  if (lateNight()) return SRC.yawn;
+  if (Math.random() < SOCCER_ODDS) return SRC.idleAlt;
+  const hat = holidayHat();
+  return SRC[`idle-${hat}`] ?? SRC.idle;
+}
+const donePose = () => SRC[`done-${holidayHat()}`] ?? SRC.done;
+
+const VERBS = {
+  Bash: 'Running command', Edit: 'Editing file', Write: 'Writing file',
+  Read: 'Reading file', Grep: 'Searching', Glob: 'Finding files',
+  NotebookEdit: 'Editing notebook',
+};
+const GROUPS = { Bash: 'bash', Read: 'read', Grep: 'read', Glob: 'read', Edit: 'edit', Write: 'edit', NotebookEdit: 'edit' };
+const ICONS = { bash: '🔨', read: '👀', edit: '✏️', other: '🧩', ok: '✅', err: '❗', text: '💬', done: '🏁' };
+const NOUNS = { bash: 'commands', read: 'reads', edit: 'edits', other: 'tool calls' };
+
+const CHEER_COOLDOWN_MS = 25_000;
+const STREAK_STEP = 5;        // same-kind tool calls in a row: cheer at 5, 10, 15…
+const BURST = { n: 8, ms: 20_000 };
+const FILES_STEP = 10;        // distinct files edited/written: cheer at 10, 20…
+const PULSE = { windowMs: 60_000, bucketMs: 1500, full: 4 }; // `full` events per bucket = max bar height
+
+const $ = sel => document.querySelector(sel);
+const grid = $('#grid'), dock = $('#dock'), dockList = $('#dockList'), empty = $('#empty');
+const sessions = new Map(); // sessionId -> session state, insertion order = grid order
+let totalEvents = 0;
+
+// Progression store (progress.js). Every call goes through persist(): a missing or broken store must never touch the live watcher.
+const P = window.CCWProgress ?? null;
+function persist(fn) {
+  try { if (P) return fn(P); } catch (e) { console.warn('[cc-watcher] progress error', e); }
+}
+// Tier 2 (deep.js): same rule — a missing or failing module never touches the live watcher.
+const Deep = window.CCWDeep ?? null;
+const deep = (name, ...args) => fx(() => Deep?.[name](...args));
+const Toys = window.CCWToys ?? null;
+const toys = (name, ...args) => fx(() => Toys?.[name](...args));
+
+Object.values(SRC).forEach(src => { new Image().src = src; });
+
+function transition(update) {
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return update();
+  // A newer transition skips the running one; the DOM update still applies, so the rejection is noise.
+  document.startViewTransition(update).ready.catch(() => {});
+}
+
+// --- connection. Phones lock, background and hop networks, and a socket can die there without ever firing onclose,
+// so the watcher sends a heartbeat every 10s and silence counts as dead. While disconnected, panels stay frozen behind
+// a banner — never shown as live. On (re)connect the watcher sends a snapshot of recent events; only the ones this page
+// hasn't seen are replayed, silently (no sounds, celebrations or progress credit). ---
+const HB_TIMEOUT_MS = 25_000, WAKE_STALE_MS = 12_000, CONNECT_TIMEOUT_MS = 8000, OFFLINE_GRACE_MS = 3000, RETRY_MAX_MS = 10_000;
+let ws = null, live = false, lastMsgAt = 0, retryMs = 1000, retryTimer = 0, offlineTimer = 0;
+let lastBoot = null, lastSeq = 0, replaying = false;
+
+function connect() {
+  clearTimeout(retryTimer);
+  const sock = ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
+  sock.onopen = () => { if (sock !== ws) return; retryMs = 1000; lastMsgAt = Date.now(); setLive(true); persist(p => p.sync?.()); };
+  sock.onmessage = msg => { if (sock !== ws) return; lastMsgAt = Date.now(); onMessage(JSON.parse(msg.data)); };
+  sock.onclose = () => { if (sock === ws) dropped(); };
+  setTimeout(() => { if (sock === ws && sock.readyState === WebSocket.CONNECTING) { abandon(sock); dropped(); } }, CONNECT_TIMEOUT_MS);
+}
+function abandon(sock) { sock.onclose = null; try { sock.close(); } catch {} }
+function dropped() {
+  ws = null;
+  setLive(false);
+  retryTimer = setTimeout(connect, retryMs * (0.75 + Math.random() / 2));
+  retryMs = Math.min(retryMs * 1.7, RETRY_MAX_MS);
+}
+// Give up on the current socket (it may be half-dead and never close) and dial again right away.
+function reconnectNow() {
+  if (ws) abandon(ws);
+  ws = null;
+  retryMs = 1000;
+  setLive(false);
+  connect();
+}
+setInterval(() => { if (ws?.readyState === WebSocket.OPEN && Date.now() - lastMsgAt > HB_TIMEOUT_MS) reconnectNow(); }, 5000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || ws?.readyState === WebSocket.CONNECTING) return;
+  if (ws?.readyState !== WebSocket.OPEN || Date.now() - lastMsgAt > WAKE_STALE_MS) reconnectNow();
+});
+addEventListener('pageshow', e => { if (e.persisted) reconnectNow(); }); // restored from the back/forward cache
+addEventListener('online', reconnectNow); // new network: the old socket is bound to the old one
+addEventListener('offline', () => { if (ws) abandon(ws); ws = null; setLive(false); showOffline(); });
+
+function setLive(on) {
+  live = on;
+  document.body.classList.toggle('live', on);
+  clearTimeout(offlineTimer);
+  if (on) {
+    document.body.classList.remove('offline');
+    $('#offline').hidden = true;
+    $('#conn').textContent = window.CCW_DEMO ? 'demo' : 'live';
+    return;
+  }
+  // A short grace period so a quick blip (wake from lock, Wi-Fi handoff) doesn't flash the banner.
+  const shown = document.body.classList.contains('offline');
+  $('#conn').textContent = shown ? 'offline' : 'reconnecting…';
+  if (!shown) offlineTimer = setTimeout(showOffline, OFFLINE_GRACE_MS);
+}
+function showOffline() {
+  if (live) return;
+  document.body.classList.add('offline');
+  $('#conn').textContent = 'offline';
+  $('#offlineWhen').textContent = lastMsgAt
+    ? `Panels are frozen as of ${new Date(lastMsgAt).toLocaleTimeString()} — not live.` : 'Nothing live to show yet.';
+  $('#offline').hidden = false;
+}
+$('#offlineHint').textContent = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  ? 'Is the watcher (npm start) still running? Retrying automatically…'
+  : 'Is the watcher (npm start) running on your computer, and is Tailscale connected on this device? Retrying automatically…';
+$('#offlineRetry').onclick = reconnectNow;
+$('#creditsBtn').onclick = () => $('#creditsDlg').showModal();
+
+function onMessage(ev) {
+  if (ev.kind === 'hb') return;
+  if (ev.kind === 'progress') return persist(p => p.syncSoon?.()); // another device changed shared progress
+  if (ev.kind === 'snapshot') return applySnapshot(ev);
+  if (ev.seq) { if (ev.seq <= lastSeq) return; lastSeq = ev.seq; }
+  handleEvent(ev);
+}
+
+function applySnapshot({ boot, events = [] }) {
+  if (boot !== lastBoot) {
+    if (lastBoot) resetSessions(); // the watcher restarted: old panels describe sessions it no longer tracks
+    lastBoot = boot;
+    lastSeq = 0;
+  }
+  replaying = true;
+  try {
+    for (const ev of events) if (ev.seq > lastSeq) { lastSeq = ev.seq; fx(() => handleEvent(ev)); }
+  } finally { replaying = false; }
+  housekeep();
+}
+
+function resetSessions() {
+  for (const s of sessions.values()) {
+    [s.timer, s.waitTimer, s.eggTimer, s.workTimer].forEach(clearTimeout);
+    s.panel.remove();
+    s.chip.remove();
+  }
+  sessions.clear();
+  totalEvents = 0;
+  focused = null;
+  grid.classList.remove('focusing');
+  $('#focusBar').hidden = true;
+  refreshChrome();
+}
+
+function createSession(id, project, projectKey) {
+  const panel = $('#panelTpl').content.firstElementChild.cloneNode(true);
+  const chip = $('#chipTpl').content.firstElementChild.cloneNode(true);
+  for (const el of [panel, chip]) {
+    el.querySelector('.proj').textContent = project;
+    el.querySelector('.sid').textContent = id;
+    el.style.viewTransitionName = `s-${id}`; // only one of the pair is ever in the DOM
+  }
+  chip.title = `Expand ${project} · ${id}`;
+  const s = {
+    id, panel, chip,
+    feed: panel.querySelector('.feed'), layers: [...panel.querySelectorAll('.sprite')], front: 0, pose: SRC.idle, statePose: SRC.idle,
+    mascot: panel.querySelector('.mascot'), waitTimer: null,
+    eggUntil: 0, eggTimer: null, pendingEgg: null, toolCount: 0, lastHeatAt: -Infinity, clicks: [],
+    verb: panel.querySelector('.verb'), detail: panel.querySelector('.detail'), meta: panel.querySelector('.meta'),
+    badge: panel.querySelector('.badge'),
+    count: 0, inFlight: 0, lastEventAt: Date.now(), expandedAt: 0, collapsed: false, state: 'idle', timer: null,
+    pill: panel.querySelector('.newpill'), canvas: panel.querySelector('.pulse'), color: '',
+    unseen: 0, atBottom: true, chasing: false,
+    hits: [], run: { group: null, n: 0 }, files: new Set(), lastCheerAt: -Infinity,
+    projectKey, project, key: projectKey, combo: 0, lastCombo: 0, startedAt: Date.now(),
+    comboEl: panel.querySelector('.combo'), led: panel.querySelector('.led'), stage: panel.querySelector('.stage'),
+    pinBtn: panel.querySelector('.act.pin'), focusBtn: panel.querySelector('.act.focus'),
+    turnTools: 0, reads: 0, lastUse: null, afterError: false, brokenCombo: 0, pbShown: false, okTimes: [], marks: new Set(),
+    saidAt: -Infinity, burstAt: 0, tickAt: 0, errSoundAt: 0, doneAt: -Infinity, speedAt: -Infinity, workTimer: null,
+    ok: 0, err: 0, maxCombo: 0, maxRun: 0, notable: null,
+  };
+  const canName = !!projectKey; // no stable key (older server) → nothing to attach a nickname/pin to
+  s.pinBtn.hidden = panel.querySelector('.act.nick').hidden = !canName;
+  s.pinBtn.onclick = () => fx(() => togglePin(s));
+  panel.querySelector('.act.nick').onclick = () => fx(() => renameProject(s));
+  panel.querySelector('.proj').addEventListener('dblclick', () => canName && fx(() => renameProject(s)));
+  s.focusBtn.onclick = () => fx(() => setFocus(focused === s ? null : s));
+  fx(() => applyProject(s));
+  chip.onclick = () => expand(s);
+  s.feed.addEventListener('scroll', () => onFeedScroll(s), { passive: true });
+  s.feed.tabIndex = 0;
+  s.feed.setAttribute('aria-label', 'Event log — arrow keys to pick an event, Enter for details');
+  s.feed.addEventListener('click', e => deep('onFeedClick', e));
+  s.feed.addEventListener('keydown', e => deep('onFeedKey', s, e));
+  deep('initReorder', s);
+  s.pill.onclick = () => chaseBottom(s);
+  s.mascot.addEventListener('click', () => onMascotClick(s));
+  // Touch has no hover tooltips: tapping the state badge shows its explanation instead.
+  s.badge.addEventListener('click', () => { if (matchMedia('(hover: none)').matches && s.badge.title) fx(() => note(s.badge.title)); });
+  new ResizeObserver(() => sizeCanvas(s)).observe(s.canvas);
+  sessions.set(id, s);
+  if (!replaying) persist(p => p.session(id));
+  transition(() => { placePanel(s); refreshChrome(); });
+  return s;
+}
+
+function setPose(s, src) {
+  if (s.pose === src) return;
+  s.pose = src;
+  const back = s.layers[1 - s.front];
+  back.src = src;
+  // Swap only once decoded so the crossfade never flashes an empty frame; a newer pose wins any race.
+  back.decode().catch(() => {}).then(() => {
+    if (s.pose !== src) return;
+    back.classList.add('front');
+    s.layers[s.front].classList.remove('front');
+    s.front = 1 - s.front;
+  });
+}
+
+function playEgg(s, key, ms, msg) {
+  if (s.collapsed) return;
+  if (persist(p => p.foundEgg(key)) === true) {
+    s.notable = `secret found — ${msg ?? key}`;
+    secretNote();
+  }
+  clearTimeout(s.eggTimer);
+  s.eggUntil = Date.now() + ms;
+  setPose(s, EGGS[key]);
+  if (msg) cheer(s, msg);
+  s.eggTimer = setTimeout(() => { endEgg(s); setPose(s, s.statePose); }, ms);
+}
+
+function endEgg(s) {
+  clearTimeout(s.eggTimer);
+  s.eggUntil = 0;
+}
+
+function setState(s, state, tool) {
+  if (tool) s.panel.dataset.tool = GROUPS[tool] ?? 'other';
+  // Roll the idle variant only on entering idle, so repeated settles don't flicker between poses.
+  const pose = state === 'idle' ? (s.state === 'idle' ? s.statePose : idlePose()) : state === 'done' ? donePose()
+    : state === 'asleep' ? asleepPose() : SRC[state];
+  if (state === 'asleep' || s.chip.dataset.state) setChipSleep(s, state === 'asleep' && pose);
+  s.state = s.panel.dataset.state = state;
+  s.badge.textContent = state;
+  s.badge.title = STATE_HINTS[state] ?? '';
+  s.color = ''; // --tool may have changed; pulse meter re-reads it lazily
+  s.statePose = pose;
+  // An egg keeps the stage until it ends — except for states the user needs to see right away.
+  if (Date.now() < s.eggUntil && state !== 'error' && state !== 'waiting') return;
+  endEgg(s);
+  setPose(s, pose);
+  if (state === 'error') {
+    s.mascot.classList.remove('shake');
+    void s.mascot.offsetWidth; // restart the shake on back-to-back errors
+    s.mascot.classList.add('shake');
+  }
+}
+
+// Docked chips normally show a still idle Clawd; only a sleeping session swaps that out, and puts it back on waking.
+function setChipSleep(s, pose) {
+  if (pose) s.chip.dataset.state = 'asleep'; else delete s.chip.dataset.state;
+  s.chip.querySelector('img').src = pose || SRC.still;
+  s.chip.querySelector('.idle').textContent = pose ? 'asleep' : 'idle';
+}
+
+function setStatus(s, verb, detail) {
+  s.verb.textContent = verb;
+  s.detail.textContent = detail || '';
+}
+
+function settle(s) {
+  if (s.inFlight) { setState(s, 'working'); return; }
+  setState(s, 'idle');
+  setStatus(s, 'Idle', 'waiting for next action…');
+}
+
+function handleEvent(ev) {
+  const s = sessions.get(ev.session) ?? createSession(ev.session, ev.project, ev.projectKey);
+  const quietFor = Date.now() - s.lastEventAt, wasAway = s.collapsed || s.state === 'away' || s.state === 'asleep';
+  s.notable = null; // only a reaction to *this* event may mark its row
+  deep('energyEvent', ev, replaying);
+  // Replayed events keep their real time, so the away/dock timers judge them by true age.
+  if (replaying && !s.count) s.startedAt = Math.min(s.startedAt, ev.ts);
+  s.lastEventAt = replaying ? ev.ts : Date.now();
+  if (s.collapsed) expand(s);
+  if (s.state === 'away' || s.state === 'asleep') settle(s);
+  if (ev.kind === 'session_start') { setStatus(s, 'Session started', ''); if (!replaying) { fx(() => sfx('start', s)); toys('onEvent', s, ev); } return; }
+
+  s.count++; totalEvents++;
+  if (ev.kind === 'tool_use') {
+    s.inFlight++;
+    clearTimeout(s.timer);
+    clearTimeout(s.waitTimer);
+    setState(s, 'working', ev.tool);
+    setStatus(s, VERBS[ev.tool] ?? ev.tool, ev.input);
+    // The session log never records "prompt shown", so a stalled promptable call is the best signal we have.
+    if (!NEVER_PROMPTS.has(ev.tool)) s.waitTimer = setTimeout(() => {
+      if (!live || !s.inFlight || s.state !== 'working') return;
+      setState(s, 'waiting');
+      setStatus(s, 'Waiting on you?', `approval prompt or a slow ${ev.tool} — ${ev.input}`);
+    }, WAIT_AFTER_MS);
+  } else if (ev.kind === 'tool_result') {
+    s.inFlight = Math.max(0, s.inFlight - 1);
+    clearTimeout(s.timer);
+    clearTimeout(s.waitTimer);
+    if (!ev.ok) {
+      setState(s, 'error');
+      setStatus(s, 'Error', ev.preview);
+      s.timer = setTimeout(() => settle(s), ERROR_MS);
+    } else {
+      if (s.state === 'waiting') setState(s, 'working');
+      if (!s.inFlight) s.timer = setTimeout(() => settle(s), LINGER_MS);
+    }
+  } else if (ev.kind === 'turn_end') {
+    s.inFlight = 0;
+    clearTimeout(s.timer);
+    clearTimeout(s.waitTimer);
+    setState(s, 'done');
+    setStatus(s, 'Done', ev.text || 'turn complete — your move');
+  } else if (ev.kind === 'text' && s.state !== 'working') {
+    if (s.state === 'done') setState(s, 'idle'); // a new turn has started
+    setStatus(s, 'Responding', ev.text);
+  }
+
+  if (ev.kind === 'tool_use') { track(s, ev); s.maxRun = Math.max(s.maxRun, s.run.n); if (!replaying) eggsOnUse(s, ev); }
+  else if (ev.kind === 'tool_result') {
+    s.lastCombo = s.combo;
+    s.combo = ev.ok ? s.combo + 1 : 0;
+    s.maxCombo = Math.max(s.maxCombo, s.combo);
+    ev.ok ? s.ok++ : s.err++;
+    if (!ev.ok) s.run = { group: null, n: 0 };
+    if (!replaying) eggsOnResult(s, ev);
+  }
+
+  // Reactions read the saved records *before* record() updates them, so "new personal best" can be detected.
+  if (!replaying) {
+    fx(() => react(s, ev, { wasAway: wasAway && quietFor > AWAY_AFTER_MS }));
+    toys('onEvent', s, ev);
+    persist(p => record(p, s, ev));
+  }
+  appendRow(s, ev);
+  s.meta.textContent = `${s.count} events · last ${new Date(ev.ts).toLocaleTimeString()}`;
+  refreshChrome();
+}
+
+function appendRow(s, ev) {
+  const { feed } = s;
+  const [group, tag, body] =
+    ev.kind === 'tool_use' ? [GROUPS[ev.tool] ?? 'other', ev.tool, ev.input]
+    : ev.kind === 'tool_result' ? (ev.ok ? ['ok', 'ok', ev.preview] : ['err', 'error', ev.preview])
+    : ev.kind === 'turn_end' ? ['done', 'done', ev.text]
+    : ['text', 'note', ev.text];
+  const row = document.createElement('li');
+  row.className = 'ev';
+  row.dataset.group = group;
+  for (const [cls, text] of [['time', new Date(ev.ts).toLocaleTimeString()], ['ico', ICONS[group]], ['tag', tag], ['body', body || '']]) {
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = text;
+    row.append(span);
+  }
+  row.querySelector('.ico').setAttribute('aria-hidden', 'true');
+  row.querySelector('.time').title = new Date(ev.ts).toLocaleString();
+  deep('tagRow', row, s, ev);
+  feed.append(row);
+  while (feed.children.length > MAX_ROWS) feed.firstElementChild.remove();
+  if (s.atBottom || s.chasing) {
+    s.chasing ? feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' }) : feed.scrollTop = feed.scrollHeight;
+  } else {
+    s.unseen++;
+    s.pill.textContent = `↓ ${s.unseen} new`;
+    s.pill.hidden = false;
+  }
+}
+
+// --- "↓ N new" pill: stick to bottom only while the user is already there ---
+const distFromBottom = feed => feed.scrollHeight - feed.scrollTop - feed.clientHeight;
+
+function onFeedScroll(s) {
+  const d = distFromBottom(s.feed);
+  if (s.chasing && d > 4) return; // mid smooth-scroll; don't mistake it for the user scrolling away
+  s.chasing = false;
+  s.atBottom = d < 40;
+  if (s.atBottom) clearUnseen(s);
+}
+
+function chaseBottom(s) {
+  s.chasing = true;
+  clearUnseen(s);
+  s.feed.scrollTo({ top: s.feed.scrollHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+function clearUnseen(s) {
+  s.unseen = 0;
+  s.pill.hidden = true;
+}
+
+// --- streaks & milestones ---
+function track(s, ev) {
+  const now = replaying ? ev.ts : Date.now(), group = GROUPS[ev.tool] ?? 'other';
+  s.hits.push(now);
+  s.run = s.run.group === group ? { group, n: s.run.n + 1 } : { group, n: 1 };
+  if (group === 'edit' && ev.input) s.files.add(ev.input);
+  ensurePulseLoop();
+
+  if (replaying || now - s.lastCheerAt < CHEER_COOLDOWN_MS) return;
+  const burst = s.hits.filter(t => now - t <= BURST.ms).length;
+  // Thresholds are ">= next milestone", so one skipped during cooldown still fires on the next call.
+  s.nextFiles ??= FILES_STEP;
+  s.nextRun ??= STREAK_STEP;
+  if (s.run.n < STREAK_STEP) s.nextRun = STREAK_STEP;
+  const msg =
+    s.files.size >= s.nextFiles ? `⚡ ${s.files.size} files touched this session`
+    : s.run.n >= s.nextRun ? `🔥 on a roll — ${s.run.n} ${NOUNS[group]} in a row`
+    : burst >= BURST.n ? `💨 ${burst} actions in ${BURST.ms / 1000}s`
+    : null;
+  if (!msg) return;
+  if (s.files.size >= s.nextFiles) s.nextFiles = (Math.floor(s.files.size / FILES_STEP) + 1) * FILES_STEP;
+  else if (s.run.n >= s.nextRun) s.nextRun = s.run.n + STREAK_STEP;
+  s.lastCheerAt = now;
+  cheer(s, msg);
+}
+
+function eggsOnUse(s, ev) {
+  const now = Date.now();
+  if (++s.toolCount % WIZARD_EVERY === 0) return playEgg(s, 'wizard', 6000, `🧙 ${s.toolCount} tool calls — wizard mode`);
+  if (ev.tool === 'Bash') {
+    const hit = EGG_BASH.find(e => e.re.test(ev.input));
+    s.pendingEgg = hit?.onSuccess ? hit : null; // push/test eggs wait for the command to succeed
+    if (hit && !hit.onSuccess) return playEgg(s, hit.egg, 3500, hit.msg);
+  }
+  if (s.hits.filter(t => now - t <= HEAT.ms).length >= HEAT.n && now - s.lastHeatAt > HEAT.cooldown) {
+    s.lastHeatAt = now;
+    playEgg(s, 'overheated', 4000, `🥵 ${HEAT.n}+ calls in ${HEAT.ms / 1000}s — overheating`);
+  }
+}
+
+function eggsOnResult(s, ev) {
+  const egg = s.pendingEgg;
+  s.pendingEgg = null;
+  if (egg && ev.ok) playEgg(s, egg.egg, 4000, egg.msg);
+}
+
+function onMascotClick(s) {
+  if (s.pose === EGGS.annoyed) return; // clicks during the huff would restart as a double-click
+  const now = Date.now();
+  s.clicks = [...s.clicks.filter(t => now - t < 2000), now];
+  if (s.clicks.length >= 5) { s.clicks = []; playEgg(s, 'annoyed', 3500, "😤 hey, I'm working here"); }
+  else if (s.clicks.length === 2 && now - s.clicks[0] < 400) {
+    playEgg(s, 'doubleJump', 2600);
+    if (Math.random() < SECRET_HANDSHAKE_ODDS) fx(() => secretHandshake(s));
+  } else fx(() => poke(s));
+}
+
+const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
+let konamiAt = 0;
+// Touch has no arrow keys: swipes stand in for the arrows, then two taps for B, A.
+function konamiStep(key) {
+  const hit = key === KONAMI[konamiAt] || (key === 'tap' && konamiAt >= 8);
+  konamiAt = hit ? konamiAt + 1 : key === KONAMI[0] ? 1 : 0;
+  if (konamiAt < KONAMI.length) return;
+  konamiAt = 0;
+  for (const s of sessions.values()) playEgg(s, 'party', 8000, '🎉 party mode');
+  fx(() => sfx('party'));
+}
+addEventListener('keydown', e => konamiStep(e.key.toLowerCase()));
+let touchFrom = null;
+addEventListener('touchstart', e => { const t = e.changedTouches[0]; touchFrom = { x: t.clientX, y: t.clientY }; }, { passive: true });
+addEventListener('touchend', e => {
+  if (!touchFrom || Deep?.recentlyDragged()) { touchFrom = null; return; } // a pane drag or long-press isn't a swipe
+  const t = e.changedTouches[0], dx = t.clientX - touchFrom.x, dy = t.clientY - touchFrom.y;
+  touchFrom = null;
+  fx(() => konamiStep(Math.max(Math.abs(dx), Math.abs(dy)) < 40 ? 'tap'
+    : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'arrowright' : 'arrowleft') : (dy > 0 ? 'arrowdown' : 'arrowup')));
+}, { passive: true });
+
+function cheer(s, text, cls = '') {
+  s.mascot.querySelector('.cheer')?.remove();
+  const el = document.createElement('div');
+  el.className = `cheer ${cls}`.trim();
+  el.setAttribute('role', 'status');
+  el.textContent = text;
+  el.addEventListener('animationend', () => el.remove(), { once: true });
+  s.mascot.append(el);
+}
+
+// --- sound: soft Web Audio blips, off by default ---
+// f: notes (Hz) played `step` seconds apart. Ticks take their pitch from the tool group instead.
+const SFX = {
+  tick:      { gain: .016, len: .05 },
+  success:   { f: [784, 1175], gain: .028, len: .1, step: .07 },
+  error:     { f: [392, 262], type: 'triangle', gain: .06, len: .16, step: .13 },
+  complete:  { f: [523, 659, 784], gain: .03, len: .14, step: .09 },
+  milestone: { f: [659, 784, 988], gain: .036, len: .12, step: .08 },
+  fanfare:   { f: [523, 659, 784, 1047, 784, 1047], gain: .04, len: .14, step: .09 },
+  rare:      { f: [1047, 1319, 1568, 2093, 1568, 2637], type: 'triangle', gain: .035, len: .24, step: .12 },
+  start:     { f: [392, 523], gain: .026, len: .1, step: .08 },
+  pop:       { f: [880, 1320], gain: .022, len: .05, step: .04 },
+  party:     { f: [523, 659, 784, 1047], gain: .045, len: .09, step: .13 },
+};
+const TICK_HZ = { bash: 196, read: 392, edit: 587, other: 294 };
+let soundOn = false, audio = null, lastBlip = 0;
+persist(p => { soundOn = p.prefs.sound; });
+
+function renderSoundBtn() {
+  const btn = $('#sound');
+  btn.textContent = soundOn ? '🔊' : '🔈';
+  btn.setAttribute('aria-pressed', soundOn);
+  btn.title = soundOn ? 'Sound on' : 'Sound off';
+}
+
+function unlockAudio() {
+  audio ??= new AudioContext();
+  if (audio.state === 'suspended') audio.resume();
+}
+
+$('#sound').onclick = () => {
+  soundOn = !soundOn;
+  persist(p => p.setPref('sound', soundOn));
+  if (soundOn) { unlockAudio(); fx(() => sfx('pop')); }
+  renderSoundBtn();
+};
+// A persisted "on" can't start audio until the page gets a gesture (autoplay policy).
+// iOS only unlocks audio on touchend/click, not pointerdown; whichever comes first does it.
+for (const type of ['pointerdown', 'touchend']) addEventListener(type, () => { if (soundOn) unlockAudio(); }, { once: true });
+// Mobile browsers suspend audio in the background; pick it back up on return.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && soundOn && audio?.state === 'suspended') audio.resume().catch(() => {}); });
+
+// Pans each sound toward the pane it came from, so two busy sessions are audibly left/right.
+function paneOutput(s) {
+  if (!s || s.collapsed || !audio.createStereoPanner) return audio.destination;
+  const r = s.panel.getBoundingClientRect(), pan = audio.createStereoPanner();
+  pan.pan.value = Math.max(-1, Math.min(1, ((r.left + r.width / 2) / innerWidth) * 2 - 1)) * 0.7;
+  pan.connect(audio.destination);
+  return pan;
+}
+
+function sfx(name, s, group) {
+  if (!soundOn || !audio || audio.state !== 'running') return;
+  const { f = [TICK_HZ[group] ?? 294], type = 'sine', gain: peak, len, step = 0 } = SFX[name], now = audio.currentTime;
+  if (name === 'tick' && now - lastBlip < 0.06) return; // a flood of events shouldn't become a buzz
+  lastBlip = now;
+  const out = paneOutput(s);
+  f.forEach((freq, i) => {
+    const t = now + i * step, osc = audio.createOscillator(), gain = audio.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    osc.connect(gain).connect(out);
+    osc.start(t);
+    osc.stop(t + len + 0.05);
+  });
+}
+renderSoundBtn();
+
+// --- persistence: writes progression records only; nothing here feeds back into live session state ---
+function record(p, s, ev) {
+  const now = Date.now();
+  p.bump('events');
+  // No key (older server) → skip per-project history rather than merge on the lossy display name.
+  if (s.projectKey) p.projectEvent(s.projectKey, ev.project);
+  p.best('sessionEvents', s.count);
+  p.best('longestSessionMs', now - (p.sessionFirstSeen(s.id) ?? s.startedAt));
+  p.best('peakActive', [...sessions.values()].filter(o => !o.collapsed).length);
+  if (ev.kind === 'tool_use') {
+    p.bump('toolCalls');
+    p.best('bestRun', s.run.n);
+    p.best('sessionFiles', s.files.size);
+    p.best('bestBurst', s.hits.filter(t => now - t <= BURST.ms).length);
+  } else if (ev.kind === 'tool_result') {
+    p.bump(ev.ok ? 'successfulActions' : 'errors');
+    p.best('bestCombo', s.combo);
+  } else if (ev.kind === 'turn_end') p.bump('turns');
+}
+
+const PROGRESS_NOTES = {
+  fresh: 'Nothing saved yet — recording starts with the next event.',
+  migrated: 'Saved progress was upgraded to the current format.',
+  recovered: "Saved progress couldn't be read, so it started fresh (the unreadable copy is kept as ccw.progress.corrupt).",
+  newer: "Saved progress is from a newer cc-watcher — shown read-only; this tab won't save.",
+  unavailable: 'Browser storage is blocked — progress only lasts until this tab closes.',
+  'save-failed': "Couldn't save (storage full?) — progress only lasts until this tab closes.",
+  reset: 'Progress reset.',
+};
+const RESET_CONFIRM = 'Reset cc-watcher progress?\n\n'
+  + 'This clears, on every device that syncs with this watcher: achievements, easter eggs found, discoveries, records and streaks, lifetime and daily totals, '
+  + 'project nicknames and pins, and preferences (sound).\n\n'
+  + "Your Claude Code sessions, repos and logs aren't touched, and live panels keep running. This can't be undone.";
+const fmtDuration = ms => !ms ? '—' : ms < 60_000 ? '<1m'
+  : ms < 3_600_000 ? `${Math.round(ms / 60_000)}m` : `${Math.floor(ms / 3_600_000)}h ${Math.round(ms % 3_600_000 / 60_000)}m`;
+
+// Without deep.js the stats sheet can't render, so the button stays hidden rather than opening an empty dialog.
+$('#progressBtn').hidden = !Deep;
+$('#progressBtn').onclick = () => deep('openStats');
+$('#progressReset').onclick = () => { if (confirm(RESET_CONFIRM)) persist(p => p.reset()); };
+// Fires after a reset here or a change from another tab: re-sync anything rendered from saved state.
+persist(p => p.onReload(() => {
+  soundOn = p.prefs.sound;
+  renderSoundBtn();
+  // Nicknames, pins and pane order may have changed on another device; back to front so each placement is final.
+  for (const s of sessions.values()) fx(() => applyProject(s));
+  // Mid-drag the pane under the finger wins; the drop re-applies the saved order anyway.
+  if (!document.body.classList.contains('reordering')) fx(() => { for (const s of orderedSessions().reverse()) if (!s.collapsed) placePanel(s); });
+  deep('refreshSheet');
+}));
+
+// =====================================================================================================
+// Tier 1 delight: reactions, combos, celebrations, pane interactions, focus mode, rare sky visitors.
+// Every entry point runs through fx(): an effect bug must never break the live watcher.
+// =====================================================================================================
+function fx(fn) {
+  try { return fn(); } catch (e) { console.warn('[cc-watcher] effect error', e); }
+}
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE = 'cubic-bezier(.2,.8,.2,1)';
+const pick = list => list[Math.floor(Math.random() * list.length)];
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const unlock = (id, kind = 'achievements') => persist(p => p.unlock(kind, id)) === true;
+// Per-session one-shot guard; lifetime one-shots use unlock() instead, which is persisted.
+const once = (s, id) => !s.marks.has(id) && !!s.marks.add(id);
+
+const STATE_HINTS = {
+  idle: 'Idle — waiting for the next action', working: 'Running a tool call',
+  waiting: 'A tool has run a while — maybe an approval prompt in your terminal',
+  error: 'The last tool call failed', done: 'Turn finished — your move', away: 'No activity for a while',
+  asleep: 'No activity for a long time — wakes on the next event',
+};
+const TEST_RE = EGG_BASH[1].re;
+const GIT_SAVE_RE = /\bgit\s+(?:commit|push)\b/;
+const SEARCH_TOOLS = new Set(['Grep', 'Glob']);
+const COMBO_LEVELS = [[50, 5], [25, 4], [15, 3], [7, 2], [3, 1]];  // [min combo, visual level]
+const COMBO_MILESTONES = { 10: 'medium', 25: 'medium', 50: 'large', 100: 'large', 250: 'large', 500: 'rare' };
+const SESSION_EVENT_MARKS = { 100: 'medium', 250: 'medium', 500: 'medium', 1000: 'large', 2500: 'large' };
+const LIFETIME_EVENT_MARKS = { 1000: 'medium', 10_000: 'large', 100_000: 'rare' };
+const LIFETIME_OK_MARKS = { 100: 'medium', 1000: 'large', 10_000: 'large' };
+const LONG_SESSION = [[4 * 3_600_000, 'large', '4h'], [2 * 3_600_000, 'medium', '2h'], [3_600_000, 'medium', '1h']];
+const CODE_GODS_ODDS = 1 / 4000;        // per success while a 20x+ combo runs
+const SECRET_HANDSHAKE_ODDS = 1 / 60;   // per mascot double-click
+const SKY_ODDS = { meteor: 1 / 180, ufo: 1 / 480, traveler: 1 / 600 }; // per minute of watched, non-empty dashboard
+const POKE_LINES = {
+  working: ['busy!', 'one sec…', 'heads down'], waiting: ['psst — check your terminal', 'need you!'],
+  error: ['not now…', 'ow.'], done: ["that's a wrap.", 'all yours.'], away: ['zz… huh?', '…five more minutes'],
+  asleep: ['zzzz…', '*snore*', 'wake me when it matters'],
+  idle: ['hi.', '…?', 'ready when you are'],
+};
+
+// --- small motion primitives (all no-ops under reduced motion) ---
+const pop = el => !reduceMotion() && el.animate({ scale: [1, 1.14, 1] }, { duration: 260, easing: EASE });
+const hop = el => !reduceMotion() && el.animate({ translate: ['0 0', '0 -3px', '0 0'] }, { duration: 220, easing: EASE });
+const wobble = el => !reduceMotion() && el.animate({ translate: ['0 0', '-2px 0', '2px 0', '-1px 0', '0 0'] }, { duration: 320, easing: 'ease-out' });
+const flashLed = s => s.led.animate({ opacity: [1, 0.18] }, { duration: 380, easing: 'ease-out' });
+
+function sweep() {
+  const bar = $('.topbar');
+  bar.classList.remove('sweep');
+  void bar.offsetWidth; // restart the animation
+  bar.classList.add('sweep');
+}
+
+let noteTimer = 0;
+function note(text, rare = false, ms = 3500) {
+  const el = $('#note');
+  el.textContent = text;
+  el.classList.toggle('rare', rare);
+  el.classList.add('show');
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+// Never reveals the total — only how many have been found.
+const secretNote = (lead = '✦ secret found') => note(Deep ? `${lead} · secrets found: ${Deep.secretsFound()}` : lead, true, 5000);
+
+// Pixel burst: a few squares fly out of `host` (must be position: relative) and fade.
+const heartPoint = (t, r) => {
+  const a = t * Math.PI * 2;
+  return [r * 0.06 * 16 * Math.sin(a) ** 3, -r * 0.06 * (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a))];
+};
+// Panels enter the DOM inside a view-transition callback (async), so effects for a just-created or
+// re-expanded pane wait briefly for it instead of being dropped.
+function whenConnected(el, fn, tries = 8) {
+  if (el.isConnected) fn(); else if (tries) setTimeout(() => whenConnected(el, fn, tries - 1), 60);
+}
+function burst(host, opts = {}) {
+  if (reduceMotion()) return;
+  if (!host.isConnected) return whenConnected(host, () => burst(host, opts));
+  const { n = 6, spread = 22, size = 3, x = 0.5, y = 0.78, color = 'var(--tool)', dur = 560, shape } = opts;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('i');
+    p.className = 'px';
+    p.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${size}px;height:${size}px;background:${color}`;
+    host.append(p);
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.6, d = spread * (0.6 + Math.random() * 0.5);
+    const [dx, dy] = shape === 'heart' ? heartPoint(i / n, spread) : [Math.cos(a) * d, Math.sin(a) * d - 6];
+    p.animate([
+      { transform: 'translate(-50%, -50%)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy)}px))`, opacity: 1, offset: shape ? 0.6 : 0.5 },
+      { transform: `translate(calc(-50% + ${Math.round(dx)}px), calc(-50% + ${Math.round(dy) - (shape ? 8 : 4)}px))`, opacity: 0 },
+    ], { duration: dur * (0.8 + Math.random() * 0.4), easing: EASE }).onfinish = () => p.remove();
+  }
+}
+
+// Pixel fireworks, confined to the pane's mascot stage so they never cover the event feed.
+function fireworks(s, colors) {
+  if (reduceMotion()) return;
+  if (!s.stage.isConnected) return whenConnected(s.stage, () => fireworks(s, colors));
+  const c = document.createElement('canvas'), dpr = devicePixelRatio || 1;
+  c.className = 'fx';
+  s.stage.append(c);
+  const w = (c.width = Math.round(s.stage.clientWidth * dpr)), h = (c.height = Math.round(s.stage.clientHeight * dpr));
+  const ctx = c.getContext('2d'), cell = Math.max(3, Math.round(3 * dpr)), start = performance.now(), parts = [];
+  colors ??= ['--accent', '--bash', '--read', '--text'].map(cssVar);
+  [[0.3, 0.42, 0], [0.72, 0.34, 260], [0.52, 0.58, 520]].forEach(([bx, by, delay]) => setTimeout(() => {
+    const color = pick(colors);
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2, v = (1.2 + Math.random() * 2.4) * dpr;
+      parts.push({ x: bx * w, y: by * h, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, color });
+    }
+  }, delay));
+  (function frame(t) {
+    ctx.clearRect(0, 0, w, h);
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.05 * dpr; p.vx *= 0.985; p.life -= 0.014;
+      if (p.life <= 0) continue;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x / cell) * cell, Math.round(p.y / cell) * cell, cell, cell);
+    }
+    if (t - start < 1900 && c.isConnected) requestAnimationFrame(frame); else c.remove();
+  })(start);
+}
+
+// --- celebrations: tiny → medium → large → rare ---
+const TIERS = ['tiny', 'medium', 'large', 'rare'];
+let bigAt = -Infinity, bigTier = -1;
+// Medium and up share a dashboard-wide 6s cooldown so celebrations never stack; only a bigger one may cut in.
+function celebrate(s, tier, msg) {
+  const t = TIERS.indexOf(tier), now = Date.now(), boost = s === focused ? 1.5 : 1;
+  if (t >= 1 && msg) deep('milestone', s, msg); // reached even if the cooldown below keeps it quiet
+  if (t >= 1) {
+    if (now - bigAt < 6000 && t <= bigTier) return false;
+    bigAt = now;
+    bigTier = t;
+  }
+  if (s.collapsed) return false;
+  if (msg) cheer(s, msg, ['', 'big', 'big', 'rare'][t]);
+  if (t === 0) burst(s.mascot, { n: Math.round(6 * boost) });
+  if (t === 1) { burst(s.mascot, { n: Math.round(12 * boost), spread: 34 }); pop(s.badge); }
+  if (t === 2) { fireworks(s); sweep(); pop(s.badge); }
+  if (t === 3) { fireworks(s, ['--bash', '--text', '--bash'].map(cssVar)); sweep(); }
+  if (t >= 1) sfx(['', 'milestone', 'fanfare', 'rare'][t], s);
+  return true;
+}
+
+// Speech bubbles stay rare: one per pane per 40s, one dashboard-wide per 12s, never over a milestone message.
+let lastSaidAt = -Infinity;
+function say(s, text, odds = 1, force = false) {
+  const now = Date.now();
+  if (s.collapsed || s.mascot.querySelector('.cheer:not(.say)')) return;
+  if (!force && (Math.random() > odds || now - s.saidAt < 40_000 || now - lastSaidAt < 12_000)) return;
+  s.saidAt = lastSaidAt = now;
+  cheer(s, text, 'say');
+}
+
+// --- combo chip: 3x+ successful results in a row, escalating from dim text to a filled gold badge ---
+function renderCombo(s) {
+  const el = s.comboEl, n = s.combo, lvl = COMBO_LEVELS.find(([min]) => n >= min)?.[1] ?? 0;
+  if (!lvl) {
+    if (el.hidden || s.comboFading) return;
+    s.comboFading = true;
+    const hide = () => { s.comboFading = false; if (s.combo < 3) el.hidden = true; };
+    const a = !reduceMotion() && el.animate({ opacity: [1, 0], translate: ['0 0', '0 3px'] }, { duration: 380, easing: EASE });
+    if (a) a.onfinish = hide; else hide();
+    return;
+  }
+  el.hidden = false;
+  el.textContent = `${n}x`;
+  el.dataset.lvl = lvl;
+  el.title = `${n} successful results in a row · personal best ${Math.max(n, P?.data.records.bestCombo ?? 0)}x`;
+  if (!reduceMotion()) el.animate({ scale: [1.18, 1] }, { duration: 180, easing: EASE });
+  if (lvl >= 3) burst(el, { n: lvl >= 5 ? 4 : 2, spread: 12, size: 2, y: 0.5, color: lvl >= 5 ? 'var(--bash)' : 'var(--accent)' });
+}
+
+// --- per-event reactions (called after live state is updated, before record() saves progress) ---
+function react(s, ev, { wasAway }) {
+  const now = Date.now(), d = P?.data;
+  if (wasAway && ev.kind !== 'turn_end') {
+    celebrate(s, 'tiny');
+    say(s, "We're back.", 0.7);
+    sfx('start', s);
+  }
+  if (ev.kind === 'tool_use') onToolUse(s, ev, now);
+  else if (ev.kind === 'tool_result') { if (ev.ok) onSuccess(s, now, d); else onError(s, now); }
+  else if (ev.kind === 'turn_end') onTurnEnd(s, now);
+
+  const mark = SESSION_EVENT_MARKS[s.count];
+  if (mark && once(s, `events${s.count}`)) celebrate(s, mark, `📈 ${s.count} events this session`);
+  const life = (d?.totals.events ?? -1) + 1;
+  if (LIFETIME_EVENT_MARKS[life] && unlock(`events-${life}`)) celebrate(s, LIFETIME_EVENT_MARKS[life], `${life.toLocaleString()} events observed`);
+}
+
+function onToolUse(s, ev, now) {
+  s.turnTools++;
+  s.lastUse = ev;
+  s.reads = GROUPS[ev.tool] === 'read' ? s.reads + 1 : 0;
+  flashLed(s);
+  // Busier dashboards tick less often, so a flood of activity never becomes a buzz.
+  if (now - s.tickAt > (Deep?.tickGap() ?? 1200)) { s.tickAt = now; sfx('tick', s, GROUPS[ev.tool] ?? 'other'); }
+  // First event ever from this repo (the store has no record of its key yet, and this tab is the recorder).
+  if (s.key && P?.writer && !P.project(s.key) && once(s, 'firstLook')) celebrate(s, 'medium', `👋 first look at ${displayName(s)}`);
+  else if (s.turnTools === 1 && now - s.doneAt < 5 * 60_000) say(s, 'One more thing…', 0.3);
+  else if (ev.tool === 'Bash' && TEST_RE.test(ev.input) && s.turnTools > 6) say(s, 'Almost there.', 0.35);
+  if (lateNight()) unlock('nightOwl');
+  clearTimeout(s.workTimer);
+  // Slow calls that can't be an approval prompt (subagents, todo churn) get a patient "Working…".
+  if (NEVER_PROMPTS.has(ev.tool)) s.workTimer = setTimeout(() => s.inFlight && s.state === 'working' && say(s, 'Working…', 0.6), 6000);
+}
+
+function onSuccess(s, now, d) {
+  // Compare against the record as it stood when this run began; record() raises it on every success.
+  if (s.combo === 1) s.runBest = d?.records.bestCombo ?? Infinity;
+  const use = s.lastUse, n = s.combo, best = s.runBest ?? Infinity;
+  const lifeOk = (d?.totals.successfulActions ?? -1) + 1;
+  const isTest = use?.tool === 'Bash' && TEST_RE.test(use.input), isGit = use?.tool === 'Bash' && GIT_SAVE_RE.test(use.input);
+  clearTimeout(s.workTimer);
+  s.okTimes = [...s.okTimes.filter(t => now - t < 15_000), now];
+  renderCombo(s);
+  if (now - s.burstAt > 700) { s.burstAt = now; burst(s.mascot, { n: 4, spread: 16 }); }
+  if (n === 5) unlock('comboStarter');
+
+  // The single most significant reaction wins; everything else about this success stays quiet.
+  // Personal best and comeback count as shown only if they actually played, so a cooldown just delays them.
+  if (lifeOk === 1 && unlock('firstBlood')) celebrate(s, 'medium', '✨ first success');
+  else if (isTest && unlock('firstTest')) celebrate(s, 'large', '✅ first test pass');
+  else if (n > best && best >= 5 && !s.pbShown && celebrate(s, 'large', `NEW PERSONAL BEST · ${n}x`)) {
+    s.pbShown = true;
+    unlock('personalBest');
+  } else if (COMBO_MILESTONES[n]) {
+    if (n >= 500) unlock('comboLegend');
+    celebrate(s, COMBO_MILESTONES[n], `${n}x combo`);
+  } else if (s.afterError && n >= 5
+    && celebrate(s, 'medium', s.brokenCombo >= 10 ? `↩ comeback — back from a ${s.brokenCombo}x break` : '↩ comeback')) {
+    s.afterError = false;
+    unlock('comeback');
+  } else if (s.okTimes.length >= 10 && now - s.speedAt > 5 * 60_000) {
+    s.speedAt = now;
+    unlock('speedDemon');
+    celebrate(s, 'medium', '⚡ 10 clean results in 15s');
+  } else if (LIFETIME_OK_MARKS[lifeOk] && unlock(lifeOk === 100 ? 'century' : `successes-${lifeOk}`)) {
+    celebrate(s, LIFETIME_OK_MARKS[lifeOk], `${lifeOk.toLocaleString()} successful actions`);
+  } else if (n >= 20 && Math.random() < CODE_GODS_ODDS) codeGods(s);
+  else if (isTest) { burst(s.mascot, { n: 10, spread: 30 }); sfx('success', s); } // the test egg already says "tests passed"
+  else if (isGit) { sfx('success', s); say(s, 'Nice.', 0.4); }
+  else if (s.afterError && n === 1) say(s, 'That worked.', 0.5);
+  else if (SEARCH_TOOLS.has(use?.tool) && s.reads >= 3) say(s, 'Found it.', 0.35);
+}
+
+function onError(s, now) {
+  clearTimeout(s.workTimer);
+  wobble(s.panel);
+  if (now - s.errSoundAt > 1500) { s.errSoundAt = now; sfx('error', s); }
+  if (s.lastCombo >= 5) say(s, 'Uh oh.', 0.6);
+  if (s.lastCombo >= 10) s.notable = `ended a ${s.lastCombo}x combo`;
+  if (s.lastCombo > 0) s.brokenCombo = s.lastCombo;
+  s.afterError = true;
+  s.pbShown = false;
+  renderCombo(s);
+}
+
+function onTurnEnd(s, now) {
+  clearTimeout(s.workTimer);
+  const big = s.turnTools >= 15;
+  celebrate(s, big ? 'medium' : 'tiny', big ? `🏁 wrapped up · ${s.turnTools} steps` : null);
+  if (now - s.doneAt > 10_000) sfx('complete', s);
+  if (!big) say(s, 'Done.', 0.15);
+  s.turnTools = 0;
+  s.doneAt = now;
+}
+
+// Runs every 5s: long-session milestones, the midnight visitor, and the sky lottery.
+function ambientTick(now) {
+  for (const s of sessions.values()) {
+    const age = now - (persist(p => p.sessionFirstSeen(s.id)) ?? s.startedAt);
+    const passed = LONG_SESSION.filter(([ms]) => age >= ms);
+    // Thresholds already behind a session when this page first sees it are marked silently, not celebrated late.
+    if (!s.longInit) { s.longInit = true; passed.forEach(([, , id]) => s.marks.add(`long${id}`)); continue; }
+    if (s.collapsed || now - s.lastEventAt > 5 * 60_000 || !passed.length) continue;
+    const [, tier, id] = passed[0];
+    if (!once(s, `long${id}`)) continue;
+    passed.forEach(([, , lower]) => s.marks.add(`long${lower}`));
+    if (id === '4h') unlock('marathon');
+    celebrate(s, tier, `⏱ ${id} session`);
+  }
+  midnightCheck(now);
+  skyTick(now);
+}
+
+// --- mascot interactions ---
+function poke(s) {
+  hop(s.mascot);
+  burst(s.mascot, { n: 4, spread: 14, y: 0.55 });
+  sfx('pop', s);
+  if (Math.random() < 0.35) say(s, pick(POKE_LINES[s.state] ?? POKE_LINES.idle), 1, true);
+}
+
+function secretHandshake(s) {
+  burst(s.mascot, { n: 16, spread: 30, shape: 'heart', color: 'var(--bash)', dur: 1500, y: 0.45 });
+  sfx('rare', s);
+  cheer(s, '✦ secret handshake', 'rare');
+  if (unlock('secretHandshake', 'discovery')) secretNote();
+}
+
+function codeGods(s) {
+  unlock('codeGods');
+  unlock('codeGods', 'discovery');
+  celebrate(s, 'rare', '✦ ✦ ✦');
+  burst(s.mascot, { n: 16, spread: 46, color: 'var(--bash)', dur: 1200 });
+  note('THE CODE GODS ARE PLEASED', true, 6000);
+}
+
+// --- nicknames & pins (stored in prefs, keyed by the repo's full path) ---
+const displayName = s => persist(p => p.nickname(s.key)) || s.project;
+const isPinned = s => !!(s.key && persist(p => p.pinned(s.key)));
+const forProject = (key, fn) => { for (const o of sessions.values()) if (o.key === key) fn(o); };
+// Pinned first, then the saved pane order (synced prefs), then first-seen. Sessions of one project share its slot.
+const orderSlot = o => { const i = o.key ? persist(p => p.order.indexOf(o.key)) ?? -1 : -1; return i < 0 ? Infinity : i; };
+const orderedSessions = () => [...sessions.values()].map((o, i) => [o, isPinned(o) ? 0 : 1, orderSlot(o), i])
+  .sort((a, b) => a[1] - b[1] || (a[2] === b[2] ? 0 : a[2] - b[2]) || a[3] - b[3]).map(([o]) => o);
+
+function applyProject(s) {
+  const name = displayName(s), pinned = isPinned(s);
+  for (const el of [s.panel, s.chip]) {
+    const proj = el.querySelector('.proj');
+    proj.textContent = name;
+    proj.title = name === s.project ? s.project : `${name} — ${s.project}`;
+    el.dataset.pinned = pinned;
+  }
+  s.chip.title = `Expand ${name} · ${s.id}`;
+  s.pinBtn.textContent = pinned ? '★' : '☆';
+  s.pinBtn.setAttribute('aria-pressed', pinned);
+  s.pinBtn.title = pinned ? 'Unpin project' : 'Pin project to the top';
+  if (s === focused) $('#focusBar').textContent = `← All sessions · ${name}`;
+}
+
+// Puts a panel in its orderedSessions() slot. Moves it only when out of place (moving resets feed scroll).
+function placePanel(s) {
+  const list = orderedSessions();
+  const ref = list.slice(list.indexOf(s) + 1).find(o => !o.collapsed && o.panel.parentNode === grid)?.panel ?? null;
+  if (s.panel.parentNode === grid && s.panel.nextElementSibling === ref) return;
+  grid.insertBefore(s.panel, ref);
+  if (s.atBottom) s.feed.scrollTop = s.feed.scrollHeight;
+}
+
+function togglePin(s) {
+  persist(p => p.setPinned(s.key, !isPinned(s)));
+  forProject(s.key, applyProject);
+  pop(s.pinBtn);
+  sfx('pop', s);
+  transition(() => {
+    for (const o of orderedSessions().reverse()) if (!o.collapsed) placePanel(o);
+    refreshChrome();
+  });
+}
+
+function renameProject(s) {
+  const proj = s.panel.querySelector('.proj');
+  if (!proj.isConnected) return; // already editing
+  const input = Object.assign(document.createElement('input'), {
+    className: 'nick-input', value: displayName(s), maxLength: 40, placeholder: s.project, spellcheck: false,
+  });
+  input.setAttribute('aria-label', `Nickname for ${s.project} (empty resets)`);
+  proj.replaceWith(input);
+  input.focus();
+  input.select();
+  let finished = false;
+  const finish = save => {
+    if (finished) return;
+    finished = true;
+    const value = input.value.trim();
+    if (save) persist(p => p.setNickname(s.key, value === s.project ? '' : value));
+    input.replaceWith(proj);
+    forProject(s.key, applyProject);
+  };
+  input.addEventListener('keydown', e => {
+    e.stopPropagation(); // keep typing away from Konami/Esc-to-unfocus
+    if (e.key === 'Enter') finish(true);
+    else if (e.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+// --- focus mode: one pane dominant, the others recede into a side column ---
+let focused = null;
+function setFocus(s) {
+  const prev = focused;
+  focused = s;
+  transition(() => {
+    if (prev) {
+      prev.panel.classList.remove('focused');
+      prev.focusBtn.setAttribute('aria-pressed', 'false');
+      prev.focusBtn.title = 'Focus this session';
+    }
+    grid.classList.toggle('focusing', !!s);
+    $('#focusBar').hidden = !s;
+    if (s) {
+      s.panel.classList.add('focused');
+      s.focusBtn.setAttribute('aria-pressed', 'true');
+      s.focusBtn.title = 'Leave focus (Esc)';
+      applyProject(s);
+      if (s.atBottom) requestAnimationFrame(() => { s.feed.scrollTop = s.feed.scrollHeight; });
+    }
+    refreshChrome();
+  });
+  sfx('pop', s ?? prev);
+}
+$('#focusBar').onclick = () => fx(() => setFocus(null));
+addEventListener('keydown', e => { if (e.key === 'Escape' && focused && !document.querySelector('dialog[open]')) fx(() => setFocus(null)); });
+
+// --- sky: rare pixel visitors, drawn with box-shadow (one cell per character) so no new image assets ---
+const ART = {
+  ufo: { rows: ['...ggggg...', '..gwwwwwg..', '.mmmmmmmmm.', 'mmymmymmymm', '.mmmmmmmmm.'], pal: { g: '#9ad7ff', w: '#e8f6ff', m: '#8c7667', y: '#ffc53d' } },
+  critterA: { rows: ['.o...o.', '.ooooo.', '.oeoeo.', '.ooooo.', 'ooooooo', '.o...o.'], pal: { o: '#ff8a3d', e: '#0d0a08' } },
+  critterB: { rows: ['.o...o.', '.ooooo.', '.oeoeo.', '.ooooo.', 'ooooooo', '..o.o..'], pal: { o: '#ff8a3d', e: '#0d0a08' } },
+  meteor: { rows: ['.......a', '.....aa.', '...bb...', '.cc.....', 'w.......'], pal: { a: '#8c766755', b: '#ffa94d99', c: '#ffc53d', w: '#fff6e8' } },
+  moon: { rows: ['..yyy.', '.yy...', 'yy....', 'yy....', '.yy...', '..yyy.'], pal: { y: '#f2e4d8' } },
+};
+// Outer box-shadow isn't painted under its own box, so every cell is offset by one and the host shifted back.
+const artShadow = (art, cell) => art.rows.flatMap((row, y) => [...row].map((ch, x) =>
+  art.pal[ch] ? `${(x + 1) * cell}px ${(y + 1) * cell}px 0 ${art.pal[ch]}` : null)).filter(Boolean).join(',');
+function pixelSprite(art, cell = 3) {
+  const el = document.createElement('div');
+  el.style.cssText = `position:absolute;left:0;top:0;width:${art.rows[0].length * cell}px;height:${art.rows.length * cell}px`;
+  const dot = document.createElement('i');
+  dot.className = 'sprite-px';
+  dot.style.cssText = `width:${cell}px;height:${cell}px;left:${-cell}px;top:${-cell}px;box-shadow:${artShadow(art, cell)}`;
+  el.append(dot);
+  return el;
+}
+
+let skyCheckAt = Date.now(), skyBusy = false, midnightShown = '';
+function skyTick(now) {
+  if (now - skyCheckAt < 60_000) return;
+  skyCheckAt = now;
+  if (document.hidden || !sessions.size || skyBusy) return;
+  const id = Object.keys(SKY_ODDS).find(k => Math.random() < SKY_ODDS[k]);
+  if (id) sky(id);
+}
+
+function midnightCheck(now) {
+  const d = new Date(now);
+  if (d.getHours() !== 0 || d.getMinutes() > 1 || midnightShown === d.toDateString() || !sessions.size || document.hidden) return;
+  midnightShown = d.toDateString();
+  sky('moon');
+}
+
+function sky(id) {
+  if (skyBusy || (reduceMotion() && id !== 'moon')) return;
+  skyBusy = true;
+  const layer = $('#sky'), W = innerWidth, H = innerHeight;
+  const spotted = () => { if (unlock(id, 'discovery')) secretNote(); };
+  const finish = el => { el.remove(); skyBusy = false; };
+
+  if (id === 'ufo') {
+    const el = pixelSprite(ART.ufo), y = Math.round(56 + Math.random() * H * 0.22), ltr = Math.random() < 0.5;
+    el.classList.add('ufo');
+    el.title = '?';
+    layer.append(el);
+    const [x0, x1] = ltr ? [-40, W + 10] : [W + 10, -40];
+    const a = el.animate([
+      { transform: `translate(${x0}px, ${y}px)` },
+      { transform: `translate(${Math.round((x0 + x1) / 2)}px, ${y - 12}px)` },
+      { transform: `translate(${x1}px, ${y + 4}px)` },
+    ], { duration: 9000, easing: 'linear' });
+    a.onfinish = () => finish(el);
+    el.onclick = () => fx(() => {
+      const { transform } = getComputedStyle(el);
+      a.cancel();
+      el.style.transform = transform;
+      sfx('rare');
+      el.animate([{ transform }, { transform: `${transform} translate(0, -${y + 40}px)` }], { duration: 420, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' })
+        .onfinish = () => finish(el);
+      if (unlock('ufoSpooked', 'discovery')) secretNote('✦ you spooked it');
+    });
+    spotted();
+  } else if (id === 'traveler') {
+    const el = pixelSprite(ART.critterA), dot = el.firstChild, y = H - 30, frames = [artShadow(ART.critterA, 3), artShadow(ART.critterB, 3)];
+    layer.append(el);
+    let f = 0;
+    const step = setInterval(() => { dot.style.boxShadow = frames[++f % 2]; }, 180);
+    el.animate([{ transform: `translate(-30px, ${y}px)` }, { transform: `translate(${W + 10}px, ${y}px)` }], { duration: 16000, easing: 'linear' })
+      .onfinish = () => { clearInterval(step); finish(el); };
+    spotted();
+  } else if (id === 'meteor') {
+    const el = pixelSprite(ART.meteor), x = Math.round(W * (0.45 + Math.random() * 0.5)), y = Math.round(20 + Math.random() * H * 0.15);
+    layer.append(el);
+    el.animate([
+      { transform: `translate(${x}px, ${y}px)`, opacity: 0 },
+      { opacity: 1, offset: 0.15 },
+      { opacity: 1, offset: 0.8 },
+      { transform: `translate(${x - 260}px, ${y + 130}px)`, opacity: 0 },
+    ], { duration: 1100, easing: 'cubic-bezier(.4,0,1,1)' }).onfinish = () => finish(el);
+    spotted();
+  } else if (id === 'moon') {
+    const el = pixelSprite(ART.moon);
+    el.style.transform = `translate(${Math.round(W * 0.5)}px, 10px)`;
+    layer.append(el);
+    el.animate({ opacity: [0, 1] }, { duration: 1200, easing: 'ease-out' });
+    note('🌙 midnight — still shipping?', false, 8000);
+    setTimeout(() => el.animate({ opacity: [1, 0] }, { duration: 1500 }).onfinish = () => finish(el), 20_000);
+    spotted();
+  } else skyBusy = false;
+}
+
+// #fx in the URL exposes triggers for checking effects without waiting hours for the odds.
+if (location.hash === '#fx') window.ccwFx = { sessions, celebrate, sky, codeGods, secretHandshake, say, poke, setFocus };
+
+// --- activity pulse meter: time-anchored buckets scroll left smoothly; loop sleeps when every panel is quiet ---
+let pulseRaf = 0;
+
+function sizeCanvas(s) {
+  const { canvas } = s, dpr = devicePixelRatio || 1;
+  canvas.width = Math.round(canvas.clientWidth * dpr);
+  canvas.height = Math.round(canvas.clientHeight * dpr);
+  drawPulse(s, Date.now());
+  if (s.hits.length) ensurePulseLoop(); // re-expanded panel whose history the loop skipped while docked
+}
+
+function drawPulse(s, now) {
+  const { canvas } = s, ctx = canvas.getContext('2d'), { width: w, height: h } = canvas;
+  if (!w) return;
+  s.hits = s.hits.filter(t => now - t < PULSE.windowMs + PULSE.bucketMs);
+  s.color ||= getComputedStyle(s.panel).getPropertyValue('--tool').trim() || '#ff8a3d';
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = s.color;
+  ctx.globalAlpha = 0.18;
+  ctx.fillRect(0, h - 1, w, 1);
+
+  const counts = new Map();
+  for (const t of s.hits) { const b = Math.floor(t / PULSE.bucketMs); counts.set(b, (counts.get(b) ?? 0) + 1); }
+  const cols = PULSE.windowMs / PULSE.bucketMs, colW = w / cols, gap = Math.max(1, colW * 0.25);
+  for (const [b, n] of counts) {
+    const age = (now - b * PULSE.bucketMs) / PULSE.windowMs; // 0 = newest edge, 1 = oldest
+    const x = w - colW - age * w;
+    if (x + colW < 0) continue;
+    const bh = Math.max(2, Math.min(1, n / PULSE.full) * (h - 2));
+    ctx.globalAlpha = 0.25 + 0.75 * (1 - age);
+    ctx.fillRect(x, h - 1 - bh, colW - gap, bh);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function pulseFrame() {
+  const now = Date.now();
+  let busy = false;
+  for (const s of sessions.values()) {
+    if (s.collapsed || !s.hits.length) continue;
+    drawPulse(s, now);
+    busy ||= s.hits.length > 0;
+  }
+  pulseRaf = busy ? requestAnimationFrame(pulseFrame) : 0;
+}
+
+function ensurePulseLoop() {
+  pulseRaf ||= requestAnimationFrame(pulseFrame);
+}
+
+function collapse(list) {
+  for (const s of list) {
+    endEgg(s);
+    s.collapsed = true;
+    s.inFlight = 0;
+    clearTimeout(s.timer);
+    clearTimeout(s.waitTimer);
+    if (s.state === 'asleep') continue; // docking doesn't wake a sleeper
+    setState(s, 'idle');
+    setStatus(s, 'Idle', 'waiting for next action…');
+  }
+  transition(() => {
+    for (const s of list) { s.panel.remove(); dockList.append(s.chip); }
+    refreshChrome();
+  });
+}
+
+function expand(s) {
+  s.collapsed = false;
+  s.expandedAt = Date.now();
+  transition(() => {
+    s.chip.remove();
+    placePanel(s);
+    refreshChrome();
+  });
+}
+
+function refreshChrome() {
+  const idle = dockList.children.length;
+  empty.hidden = sessions.size > 0;
+  grid.hidden = sessions.size === idle;
+  dock.hidden = !idle;
+  $('#stats').textContent = `${sessions.size - idle} active · ${idle} idle · ${totalEvents} events`;
+  // Focus layout: the focused pane spans one row per receded pane beside it.
+  const visible = sessions.size - idle;
+  grid.style.setProperty('--n', Math.max(1, visible - 1));
+  grid.classList.toggle('solo', visible <= 1);
+}
+
+function housekeep() {
+  // No events while disconnected says nothing about the sessions — don't doze or dock them on that basis.
+  if (!live) return;
+  const now = Date.now(), sleepMs = sleepAfterMs();
+  // Docked sessions too: in the overlay, a docked sleeper is the Clawd shown once every session has gone quiet.
+  for (const s of sessions.values()) {
+    if (!sleepMs || s.inFlight || !['idle', 'done', 'away'].includes(s.state) || now - s.lastEventAt < sleepMs) continue;
+    setState(s, 'asleep');
+    setStatus(s, 'Asleep', `no activity for ${Math.round((now - s.lastEventAt) / 60_000)} min — sound asleep`);
+  }
+  for (const s of sessions.values()) {
+    if (s.collapsed || (s.state !== 'idle' && s.state !== 'done') || now - s.lastEventAt < AWAY_AFTER_MS) continue;
+    setState(s, 'away');
+    setStatus(s, 'Away', 'no activity for a while — dozing');
+  }
+  // A focused or dragged pane never auto-docks out from under the user.
+  const stale = [...sessions.values()].filter(s => !s.collapsed && s !== focused && !Deep?.isDragging(s) && now - Math.max(s.lastEventAt, s.expandedAt) > COLLAPSE_AFTER_MS);
+  if (stale.length) collapse(stale);
+  fx(() => ambientTick(now));
+}
+setInterval(housekeep, 5000);
+// Reduced motion switched while someone sleeps: swap between the animated and the still sleeping pose.
+matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => {
+  for (const s of sessions.values()) if (s.state === 'asleep') setState(s, 'asleep');
+});
+
+deep('init');
+toys('init');
+connect();
+// Installable app shell. Service workers need a secure context: localhost, or HTTPS such as `tailscale serve`.
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+</script>
+</body>
+</html>

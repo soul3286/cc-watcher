@@ -1,0 +1,73 @@
+/* Mascot-only overlay. Injected into the desktop app's overlay window only (webContents.insertCSS) — the browser, the
+   phone and the desktop app's dashboard window never load it. Geometry vars (--ccw-*) come from preload.js.
+   Every rule is scoped under html.ccw-overlay (set by overlay.js): injected CSS comes before the page's own sheets,
+   so a rule only as specific as the dashboard's loses the tie. The scope keeps each one strictly more specific. */
+
+html.ccw-overlay, html.ccw-overlay body { background: transparent; }
+html.ccw-overlay body { overflow: hidden; }
+html.ccw-overlay body::before, html.ccw-overlay #motes, html.ccw-overlay #sky, html.ccw-overlay #offline,
+html.ccw-overlay #dock, html.ccw-overlay #empty { display: none; }
+html.ccw-overlay .sheet::backdrop { background: transparent; }
+
+/* The top bar stays in the page (the toy box and #note live in it) but is invisible. */
+html.ccw-overlay .topbar { visibility: hidden; position: fixed; inset: 0 0 auto 0; }
+
+/* A filter/opacity on #grid would become the containing block of the fixed pane below and move it
+   (the page greys #grid out when offline, with `body.offline #grid`, hence the extra `body`). */
+html.ccw-overlay body #grid { filter: none; opacity: 1; overflow: visible; padding: 0; }
+
+/* Page morphs (view transitions) lay a full-window snapshot over everything while they run; finish them at once. */
+html.ccw-overlay:root::view-transition-group(*), html.ccw-overlay:root::view-transition-old(*),
+html.ccw-overlay:root::view-transition-new(*) { animation: none; }
+
+/* Only the chosen session's pane is laid out; the rest stay hidden (they keep running as normal). */
+html.ccw-overlay .panel { display: none; view-transition-name: none; }
+html.ccw-overlay .panel.ccw-primary {
+  display: block; position: fixed; z-index: 10; left: var(--ccw-pl); top: var(--ccw-pt); width: var(--ccw-bw); height: var(--ccw-bh);
+  background: none; border: 0; border-radius: 0; box-shadow: none; overflow: visible; translate: none; animation: none;
+}
+html.ccw-overlay .panel.ccw-primary > :not(.stage), html.ccw-overlay .panel.ccw-primary .status { display: none; }
+/* The pane's mascot strip becomes the game bubble; Clawd himself hangs just outside it, towards the window centre. */
+html.ccw-overlay .panel.ccw-primary .stage {
+  position: relative; width: 100%; height: 100%; padding: 0; gap: 0; border: 0; border-radius: 8px; transition: background .2s, box-shadow .2s;
+}
+html.ccw-overlay .panel.ccw-primary .stage:has(> .toy-game) {
+  background: color-mix(in srgb, var(--bg2) 94%, transparent); box-shadow: 0 0 0 1px var(--line), 0 8px 24px rgb(0 0 0 / .45);
+}
+html.ccw-overlay .panel.ccw-primary .mascot { position: absolute; left: var(--ccw-ml); top: var(--ccw-mt); cursor: grab; touch-action: none; }
+html.ccw-overlay.ccw-dragging, html.ccw-overlay.ccw-dragging * { cursor: grabbing; }
+html.ccw-overlay body.offline .panel.ccw-primary .mascot, html.ccw-overlay body.offline #ccwClawd { filter: grayscale(.9); opacity: .55; }
+
+/* Fallback Clawd when no pane is on screen (no sessions yet, or every session docked as idle). */
+html.ccw-overlay #ccwClawd {
+  display: none; position: fixed; z-index: 10; left: calc(var(--ccw-cx) - var(--sprite) / 2); top: calc(var(--ccw-cy) - var(--sprite) / 2);
+  width: var(--sprite); height: var(--sprite); cursor: grab; touch-action: none;
+}
+html.ccw-overlay:not(.ccw-has-pane) #ccwClawd { display: block; }
+html.ccw-overlay #ccwClawd img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+
+/* Session count, only when 2 or more panes are live. */
+html.ccw-overlay #ccwBadge {
+  position: fixed; left: calc(var(--ccw-cx) + var(--sprite) / 2 - 18px); top: calc(var(--ccw-cy) - var(--sprite) / 2 + 2px); z-index: 11;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: grid; place-items: center;
+  background: var(--bg3); border: 1px solid var(--line); color: var(--dim); font: 700 10px 'Cascadia Code', Consolas, monospace;
+  pointer-events: none;
+}
+html.ccw-overlay #ccwBadge[hidden] { display: none; }
+
+/* Short notes ("secret found", "confetti!") appear as a small pill under Clawd. */
+html.ccw-overlay #note {
+  visibility: visible; position: fixed; left: var(--ccw-cx); top: calc(var(--ccw-cy) + var(--sprite) / 2 + 4px); translate: -50% 0;
+  max-width: calc(var(--ccw-bw) + var(--sprite)); padding: 2px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: color-mix(in srgb, var(--bg2) 92%, transparent); border: 1px solid var(--line); pointer-events: none;
+}
+html.ccw-overlay #note:not(.show) { visibility: hidden; }
+
+/* Popup: the dashboard's own toy box, moved next to Clawd, plus the games row overlay.js adds. */
+html.ccw-overlay .toybox {
+  visibility: visible; position: fixed; top: 0; left: 0; z-index: 12; width: var(--ccw-bw); max-width: none; max-height: calc(100vh - 8px); overflow-y: auto;
+}
+html.ccw-overlay .toybox .bingo { width: 100%; margin: 4px 2px 2px; }
+
+/* Doodle and other sheets must fit the small transparent window. */
+html.ccw-overlay .sheet { max-width: calc(100vw - 8px); max-height: calc(100vh - 8px); }

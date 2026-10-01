@@ -1,0 +1,69 @@
+{
+  "name": "cc-watcher",
+  "version": "1.0.0",
+  "description": "Live visual dashboard for Claude Code sessions",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/progress.test.js",
+    "desktop": "electron .",
+    "dist": "electron-builder --win nsis",
+    "release": "node scripts/make-release.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  },
+  "productName": "CC Live",
+  "build": {
+    "appId": "com.ccwatcher.desktop",
+    "productName": "CC Live",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "package.json",
+      "!node_modules/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "electron/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "CC Live"
+    },
+    "extraResources": [
+      {
+        "from": "server.js",
+        "to": "app/server.js"
+      },
+      {
+        "from": "public",
+        "to": "app/public"
+      },
+      {
+        "from": "node_modules/chokidar",
+        "to": "app/node_modules/chokidar"
+      },
+      {
+        "from": "node_modules/readdirp",
+        "to": "app/node_modules/readdirp"
+      },
+      {
+        "from": "node_modules/ws",
+        "to": "app/node_modules/ws"
+      }
+    ]
+  }
+}
