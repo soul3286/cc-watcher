@@ -16,9 +16,6 @@
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background-color: var(--bg); color: var(--fg); font: 15px/1.65 var(--mono); overflow-x: clip;
-  /* faint pixel grid, same as the showcase video */
-  background-image: linear-gradient(rgb(255 138 61 / .03) 1px, transparent 1px), linear-gradient(90deg, rgb(255 138 61 / .03) 1px, transparent 1px);
-  background-size: 96px 96px; background-position: center top;
 }
 @media (min-width: 1024px) { body { font-size: 16px; } }
 img, video, iframe { display: block; max-width: 100%; }

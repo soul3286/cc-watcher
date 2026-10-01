@@ -9,7 +9,7 @@
   --sans: 'Mona Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --r: 12px; --deep: #0f0607;
 }
-body { font-family: var(--sans); background-image: none; background-color: var(--bg); }
+body { font-family: var(--sans); }
 .btn, .brand, .menu-btn, .mood-btns button, .copy, .demo-badge, .st-title, .zzz { font-family: var(--sans); }
 code { color: var(--gold); background: rgb(255 211 107 / .1); }
 :focus-visible { outline-color: var(--pink); }
