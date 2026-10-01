@@ -32,7 +32,7 @@
     { s: 'idle', title: 'Idle', detail: 'waiting for next action…', img: 'mascot-idle-vibe.gif', dur: 5200 },
   ];
   const PILL = { read: 'WORKING', edit: 'WORKING', run: 'WORKING', wait: 'WAITING', done: 'DONE', idle: 'IDLE', asleep: 'ASLEEP' };
-  const CAP = 'psst — he likes being clicked';
+  const CAP = 'psst — try clicking him';
   let i = 0, events = 12, streak = 4, timer = 0, visible = true, sleeping = false, busy = false;
   const clock = () => new Date().toTimeString().slice(0, 8);
   const sprite = f => { const src = SPR + f; if (!img.src.endsWith(src)) img.src = src; };

@@ -45,7 +45,7 @@ If the phone can't reach the computer (it's asleep, the watcher isn't running, T
 
 ## Desktop mascot (Windows only)
 
-A separate download, **CC Live Setup.exe**, puts Clawd on your desktop as a small floating mascot showing the most important thing across all your sessions. Double-click him for the full dashboard. It includes its own copy of the watcher, so it works without this folder.
+A separate download, **CC.Live.Setup.1.0.0.exe**, puts Clawd on your desktop as a small floating mascot showing the most important thing across all your sessions. Double-click him for the full dashboard. It includes its own copy of the watcher, so it works without this folder.
 
 The installer isn't code-signed, so Windows SmartScreen asks once: **More info → Run anyway**.
 
@@ -69,8 +69,14 @@ All mascot pictures are in `public/sprites/`, and `public/sprites.js` says which
 ## Credits
 
 - **Clawd**, **Claude** and **Claude Code** are characters and trademarks of **Anthropic**. All rights to the mascot and its artwork belong to Anthropic and the original creators.
-- The animated mascot sprites were made with **[crashchen/cc-gifs](https://github.com/crashchen/cc-gifs)**. Its MIT licence covers its generator code, not the character.
-- **None of the sprites were drawn by this project's author.** They are all borrowed, and credited here.
+- **None of the sprites were drawn by this project's author.** They were collected from the sources below, then resized, cropped or recoloured to fit the dashboard:
+  - **[Tenor: "Claw'd crab laptop"](https://tenor.com/view/claude-claude-code-claw'd-crab-laptop-gif-14833619646318452398)**: working pose (laptop) and the still idle frames
+  - **[Tenor: "Claw'd crab football"](https://tenor.com/view/claude-claude-code-claw'd-crab-football-gif-17523955505938523920)**: soccer idle pose
+  - **Tenor: Claude Code sparkler GIF**: party easter egg
+  - **[@claudeai on X](https://x.com/claudeai/status/2019833113418035237)**, via [ayotomcs.me/claude-mascot](https://ayotomcs.me/claude-mascot): flag-waving "done" pose, cut from Anthropic's official clip
+  - **[rullerzhou-afk/clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk)** (AGPL-3.0): headphones, error, waiting, sleeping and yawn poses; juggling, happy, annoyed and double-jump eggs; Santa, pumpkin and party hats
+  - **[marciogranzotto/clawd-tank](https://github.com/marciogranzotto/clawd-tank)** (MIT, © 2026 Marcio Granzotto Rodrigues): wizard, dizzy and overheated eggs
+- The code was written by **Claude Opus 5.5**, Anthropic's AI model, working in Claude Code. Thank you, Opus.
 - This is a **free, non-commercial fan project**, not affiliated with, endorsed by or sponsored by Anthropic.
 - If you made any of this art and want it credited differently or removed, please open an issue: **https://github.com/soul3286/cc-watcher/issues**
 

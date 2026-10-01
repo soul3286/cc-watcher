@@ -35,9 +35,32 @@ does NOT apply to, and grants no rights in, the mascot artwork:
 None of this artwork was made by this project's author. Clawd, Claude and
 Claude Code are characters and trademarks of Anthropic; all rights in the
 mascot and its artwork belong to Anthropic and the original creators. The
-animated sprites were made with crashchen/cc-gifs
-(https://github.com/crashchen/cc-gifs), whose MIT licence likewise covers only
-its generator code, not the character.
+sprites were collected from these sources, then resized, cropped or recoloured.
+Each file keeps its source's terms:
+
+  Tenor (https://tenor.com) and Anthropic's own clip
+  (https://x.com/claudeai/status/2019833113418035237, via
+  https://ayotomcs.me/claude-mascot):
+    mascot.gif, mascot-idle.png, mascot-blink.png, mascot-idle-soccer.gif,
+    mascot-done.gif, egg-party.gif, and the app icons
+
+  rullerzhou-afk/clawd-on-desk (https://github.com/rullerzhou-afk/clawd-on-desk),
+  licensed AGPL-3.0. These files are modified versions and are offered under
+  AGPL-3.0 (https://www.gnu.org/licenses/agpl-3.0.html):
+    mascot-idle-vibe.gif, mascot-idle-vibe-party.gif,
+    mascot-idle-vibe-pumpkin.gif, mascot-idle-vibe-santa.gif,
+    mascot-idle-yawn.gif, mascot-error.gif, mascot-waiting.gif,
+    mascot-away.gif, mascot-asleep.png, egg-juggling.gif, egg-happy.gif,
+    egg-annoyed.gif, egg-double-jump.gif, and the hats in
+    mascot-done-party.gif, mascot-done-pumpkin.gif, mascot-done-santa.gif
+
+  marciogranzotto/clawd-tank (https://github.com/marciogranzotto/clawd-tank),
+  MIT licence, Copyright (c) 2026 Marcio Granzotto Rodrigues (same MIT text
+  as above):
+    egg-wizard.gif, egg-dizzy.gif, egg-overheated.gif
+
+The code was written by Claude Opus 5.5, Anthropic's AI model, working in
+Claude Code.
 
 This is a free, non-commercial fan project, not affiliated with, endorsed by or
 sponsored by Anthropic. If you fork it, you can swap in your own art: put new

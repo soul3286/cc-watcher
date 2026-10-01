@@ -426,6 +426,7 @@
   #replayBtn { background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--dim); font-size: 13px; line-height: 1; padding: 3px 7px; cursor: pointer; }
   #demoBtn { font-size: 11px; letter-spacing: .5px; white-space: nowrap; }
   .credits p { margin: 0 0 10px; line-height: 1.5; }
+  .credits ul { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; }
   .credits a { color: var(--accent); }
   #replayBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .sheet.replay { width: min(860px, calc(100vw - 32px)); height: min(760px, calc(100dvh - 48px)); max-height: none; border-style: dashed; border-color: color-mix(in srgb, var(--read) 55%, var(--line)); }
@@ -587,7 +588,15 @@
     <div class="sheet-body credits" tabindex="0">
       <p><b>A free, non-commercial fan project.</b> Not affiliated with, endorsed by or sponsored by Anthropic.</p>
       <p><b>Clawd</b>, <b>Claude</b> and <b>Claude Code</b> are characters and trademarks of Anthropic. All rights to the mascot and its artwork belong to Anthropic and the original creators.</p>
-      <p>The animated mascot sprites were made with <a href="https://github.com/crashchen/cc-gifs" target="_blank" rel="noopener">crashchen/cc-gifs</a> (MIT-licensed generator code; the licence covers the code, not the character). None of the sprites were drawn by this project's author.</p>
+      <p>None of the sprites were drawn by this project's author. They were collected from these sources, then resized, cropped or recoloured:</p>
+      <ul>
+        <li><a href="https://tenor.com/view/claude-claude-code-claw'd-crab-laptop-gif-14833619646318452398" target="_blank" rel="noopener">Tenor "Claw'd crab laptop"</a>: working pose, still idle frames</li>
+        <li><a href="https://tenor.com/view/claude-claude-code-claw'd-crab-football-gif-17523955505938523920" target="_blank" rel="noopener">Tenor "Claw'd crab football"</a>: soccer pose. A Tenor Claude Code sparkler GIF: party egg</li>
+        <li><a href="https://x.com/claudeai/status/2019833113418035237" target="_blank" rel="noopener">@claudeai on X</a>, via <a href="https://ayotomcs.me/claude-mascot" target="_blank" rel="noopener">ayotomcs.me</a>: flag-waving pose</li>
+        <li><a href="https://github.com/rullerzhou-afk/clawd-on-desk" target="_blank" rel="noopener">rullerzhou-afk/clawd-on-desk</a> (AGPL-3.0): headphones, error, waiting, sleeping, yawn, juggling, happy, annoyed, double-jump, holiday hats</li>
+        <li><a href="https://github.com/marciogranzotto/clawd-tank" target="_blank" rel="noopener">marciogranzotto/clawd-tank</a> (MIT, © 2026 Marcio Granzotto Rodrigues): wizard, dizzy, overheated</li>
+      </ul>
+      <p>The code was written by <b>Claude Opus 5.5</b>, Anthropic's AI model, working in Claude Code. Thank you, Opus.</p>
       <p>If you made any of this art and want it credited differently or removed, please open an issue: <a href="https://github.com/soul3286/cc-watcher/issues" target="_blank" rel="noopener">github.com/soul3286/cc-watcher/issues</a></p>
       <p class="note">To use your own art, put new pictures in <code>public/sprites/</code> and point the names in <code>public/sprites.js</code> at them.</p>
     </div>
