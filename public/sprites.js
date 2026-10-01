@@ -12,7 +12,8 @@ self.CCW_SPRITES = (() => {
     }),
     egg: at({
       wizard: 'egg-wizard.gif', juggling: 'egg-juggling.gif', happy: 'egg-happy.gif', dizzy: 'egg-dizzy.gif',
-      overheated: 'egg-overheated.gif', annoyed: 'egg-annoyed.gif', doubleJump: 'egg-double-jump.gif', party: 'egg-party.gif',
+      overheated: 'egg-overheated.gif', doubleJump: 'egg-double-jump.gif', party: 'egg-party.gif',
+      pet: 'egg-happy.gif', petParty: 'egg-party.gif',
     }),
   };
 })();

@@ -48,7 +48,7 @@
     secretHandshake: 'Secret handshake', codeGods: 'The code gods', ufo: 'UFO sighting', ufoSpooked: 'Spooked the UFO',
     traveler: 'The traveler', meteor: 'Meteor', moon: 'Midnight moon',
     wizard: 'Wizard mode', juggling: 'Push juggle', happy: 'Test dance', dizzy: 'rm -rf dizzy', overheated: 'Overheated',
-    annoyed: 'Annoyed', doubleJump: 'Double jump', party: 'Party mode',
+    pet: 'Head pats', petParty: 'Five-pat party', doubleJump: 'Double jump', party: 'Party mode',
     toybox: 'The toy box', 'toy-confetti': 'Confetti', 'toy-celebrate': 'Just because', 'toy-sticker': 'Sticker book',
     'toy-highfive': 'High five', 'toy-coffee': 'Coffee break', 'toy-doodle': 'Doodler', 'toy-ripple': 'Ripples',
     'game-hunt': 'Pixel hunter', 'game-catch': 'Quick hands', 'game-bug': 'Bug spotter', 'game-reaction': 'Reflexes', 'game-bingo': 'BINGO!',

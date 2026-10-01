@@ -45,7 +45,7 @@ If the phone can't reach the computer (it's asleep, the watcher isn't running, T
 
 ## Desktop mascot (Windows only)
 
-A separate download, **CC.Live.Setup.1.0.0.exe**, puts Clawd on your desktop as a small floating mascot showing the most important thing across all your sessions. Double-click him for the full dashboard. It includes its own copy of the watcher, so it works without this folder.
+A separate download, **CC.Live.Setup.1.0.0.exe**, puts Clawd on your desktop as a small floating mascot showing the most important thing across all your sessions. Double-click him for the full dashboard; minimize or close the dashboard and he's back on your desktop. It includes its own copy of the watcher, so it works without this folder.
 
 The installer isn't code-signed, so Windows SmartScreen asks once: **More info → Run anyway**.
 
@@ -74,7 +74,7 @@ All mascot pictures are in `public/sprites/`, and `public/sprites.js` says which
   - **[Tenor: "Claw'd crab football"](https://tenor.com/view/claude-claude-code-claw'd-crab-football-gif-17523955505938523920)**: soccer idle pose
   - **Tenor: Claude Code sparkler GIF**: party easter egg
   - **[@claudeai on X](https://x.com/claudeai/status/2019833113418035237)**, via [ayotomcs.me/claude-mascot](https://ayotomcs.me/claude-mascot): flag-waving "done" pose, cut from Anthropic's official clip
-  - **[rullerzhou-afk/clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk)** (AGPL-3.0): headphones, error, waiting, sleeping and yawn poses; juggling, happy, annoyed and double-jump eggs; Santa, pumpkin and party hats
+  - **[rullerzhou-afk/clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk)** (AGPL-3.0): headphones, error, waiting, sleeping and yawn poses; juggling, happy and double-jump eggs; Santa, pumpkin and party hats
   - **[marciogranzotto/clawd-tank](https://github.com/marciogranzotto/clawd-tank)** (MIT, © 2026 Marcio Granzotto Rodrigues): wizard, dizzy and overheated eggs
 - The code was written by **Claude Opus 5.5**, Anthropic's AI model, working in Claude Code. Thank you, Opus.
 - This is a **free, non-commercial fan project**, not affiliated with, endorsed by or sponsored by Anthropic.
