@@ -1,0 +1,100 @@
+/* Crush-style theme in Clawd's colours: sunset sky, pixel display type, candy panels. Loaded after style.css; overrides tokens and surfaces only. */
+@font-face { font-family: 'Jersey 10'; src: url('fonts/Jersey10.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Mona Sans'; src: url('fonts/MonaSans.woff2') format('woff2'); font-weight: 200 900; font-stretch: 75% 125%; font-display: swap; }
+
+:root {
+  --bg: #1a0d0f; --panel: #2a1517; --line: #4d2723; --fg: #fff3e8; --dim: #ecccb9; --faint: #b48d7c;
+  --accent: #ff8a5c; --gold: #ffd27a; --pink: #ff6f5e; --lilac: #ffb48a; --clawd: #d87050; --ok: #8fe3a8; --bad: #ff5e6c;
+  --head: 'Jersey 10', 'Arial Black', sans-serif;
+  --sans: 'Mona Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --r: 12px; --deep: #0f0607;
+}
+body { font-family: var(--sans); background-image: none; background-color: var(--bg); }
+.btn, .brand, .menu-btn, .mood-btns button, .copy, .demo-badge, .st-title, .zzz { font-family: var(--sans); }
+code { color: var(--gold); background: rgb(255 211 107 / .1); }
+:focus-visible { outline-color: var(--pink); }
+::selection { background: var(--pink); color: var(--deep); }
+
+/* sky: the one loud moment */
+.hero { position: relative; isolation: isolate; }
+.sky { position: absolute; z-index: -1; inset: -60px calc(50% - 50vw) -40px; overflow: hidden; pointer-events: none;
+  background:
+    radial-gradient(40% 55% at 78% 30%, rgb(255 111 94 / .55), transparent 70%),
+    radial-gradient(35% 45% at 20% 75%, rgb(216 112 80 / .45), transparent 70%),
+    radial-gradient(30% 40% at 55% 95%, rgb(255 190 120 / .35), transparent 70%),
+    linear-gradient(180deg, #2b0f16 0%, #4a1a1c 45%, var(--bg) 100%);
+  mask-image: linear-gradient(180deg, #000 75%, transparent); }
+.spark { position: absolute; width: var(--s, 18px); aspect-ratio: 1; background: #fff;
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  filter: drop-shadow(0 0 6px rgb(255 255 255 / .8)); animation: twinkle 3.2s var(--ease) infinite; animation-delay: var(--d, 0s); }
+@keyframes twinkle { 50% { transform: scale(.55) rotate(45deg); opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .spark { animation: none; } }
+
+/* pixel wordmark headings */
+h1, h2 { font-family: var(--head); font-weight: 400; letter-spacing: 0; line-height: .88; }
+h1 { font-size: clamp(58px, 10vw, 112px); color: var(--fg); text-shadow: 0 4px 0 var(--clawd), 0 8px 0 #7a2e22, 0 0 40px rgb(255 111 94 / .5); }
+h2 { font-size: clamp(42px, 6vw, 72px); color: var(--fg); text-shadow: 0 3px 0 #7a2e22; }
+h3 { font-weight: 800; font-stretch: 110%; }
+.caret { color: var(--accent); text-shadow: none; }
+.lede { color: #ffe9dc; }
+
+/* sticker tags instead of tracked caps */
+.eyebrow { display: inline-flex; font-size: 13px; letter-spacing: 0; text-transform: lowercase; font-weight: 700; color: var(--deep);
+  background: var(--lilac); padding: 4px 12px 4px 10px; border-radius: 99px; transform: rotate(-2deg); }
+.eyebrow::before { width: 6px; height: 6px; border-radius: 50%; background: var(--deep); }
+.hero .eyebrow { background: var(--gold); }
+.dot { background: var(--deep); box-shadow: none; border-radius: 50%; width: 7px; height: 7px; }
+.trust { color: #ffe9dc; } .trust i { color: var(--gold); }
+
+/* buttons: Clawd orange is the only warm surface */
+.btn { border-radius: 12px; font-weight: 800; box-shadow: 0 4px 0 #a3401c; }
+.btn:hover { box-shadow: 0 6px 0 #a3401c; }
+.btn:active { box-shadow: 0 1px 0 #a3401c; }
+.btn-ghost { color: var(--fg); border-color: var(--lilac); background: rgb(26 13 15 / .35); box-shadow: none; }
+.btn-ghost:hover, .btn-ghost:active { color: var(--fg); border-color: var(--pink); background: rgb(255 111 94 / .14); }
+
+/* header */
+.top.scrolled, .top { border-color: transparent; }
+.top.scrolled { background-color: rgb(26 13 15 / .88); border-color: var(--line); }
+.brand { font-family: var(--head); font-size: 26px; letter-spacing: .02em; font-weight: 400; }
+#nav a:not(.btn) { color: #ffe3d3; font-size: 14px; border-radius: 8px; }
+#nav a:not(.btn):hover { background: rgb(255 255 255 / .08); }
+@media (max-width: 767px) { .top { background-color: rgb(26 13 15 / .92); } .menu-btn { border-radius: 10px; } #nav { border-radius: 14px; } }
+
+/* candy panels: chunky radius, glossy top edge, hard shadow */
+.stage, .demo-frame, .feat, .step, .term, .lic, .video, .ev-desk img, .ev-live-desk, .mini-log, .cmd {
+  border-radius: 18px; border: 2px solid var(--line);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .1), 0 6px 0 var(--deep); }
+.mini-log, .cmd { border-radius: 12px; box-shadow: inset 0 1px 0 rgb(255 255 255 / .05); background: var(--deep); }
+.feat:hover { border-color: var(--lilac); }
+.sec + .sec { border-top: 0; }
+.f-n { color: var(--lilac); }
+
+/* hero terminal card */
+.stage { background: #210f11; border-color: var(--pink); box-shadow: 0 0 0 6px rgb(255 111 94 / .12), 0 10px 0 var(--deep), 0 40px 80px -20px rgb(255 111 94 / .35); }
+.stage::before, .stage::after { display: none; }
+.stage-bar { border-color: var(--line); }
+.stage-main { background-image: radial-gradient(rgb(255 180 138 / .1) 1px, transparent 1.5px); }
+.clawd::after { background: radial-gradient(rgb(255 111 94 / .4), transparent 70%); }
+.log { border-color: var(--line); }
+.chips li { border-radius: 99px; }
+.stage[data-s="idle"] .pill, .stage[data-s="asleep"] .pill { border-color: var(--line); }
+.stage-cap { color: #ffe9dc; }
+.stage-cap::before { color: var(--pink); }
+
+/* the rest picks up tokens; a few surfaces were hard-coded brown */
+.ev-live-desk { background: radial-gradient(120% 80% at 70% 20%, #4a1d1c, #1c0c0e 70%); }
+.ev-live-desk::after { box-shadow: -16px 0 0 var(--line), -32px 0 0 var(--line); }
+.ev-phone img { border-color: #3a1c1a; }
+.ev figcaption b, .s-n { color: var(--lilac); }
+.s-n { color: transparent; -webkit-text-stroke: 1.5px var(--pink); font-family: var(--head); }
+.mood-btns button { background: var(--deep); }
+.mood-btns button[aria-pressed="true"] { color: var(--deep); background: var(--gold); border-color: var(--gold); }
+.badge-pop { border-color: var(--pink); color: var(--pink); background: rgb(255 111 94 / .1); border-radius: 99px; }
+.stat b { color: var(--gold); }
+.sc-fill { background: linear-gradient(90deg, var(--pink), var(--accent)); }
+.copy { background: var(--panel); color: var(--gold); border-color: var(--line); }
+.term-rows b { font-family: var(--head); }
+.cred-text li::before { background: var(--pink); border-radius: 50%; }
+.lic-row { border-radius: 10px; background: var(--deep); }
+.foot, footer { border-color: var(--line); }

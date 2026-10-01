@@ -1,11 +1,10 @@
-@font-face { font-family: 'Archivo Black'; src: url('fonts/ArchivoBlack.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'JetBrains Mono'; src: url('fonts/JetBrainsMono.woff2') format('woff2'); font-weight: 100 800; font-display: swap; }
 
 :root {
   --bg: #0d0a08; --panel: #15100d; --line: #2c221b; --fg: #f4e9dd; --dim: #b39a88; --accent: #ff8a3d; --gold: #ffc53d;
   --ok: #8fd18a; --bad: #ff6b5a; --faint: #9c8676;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --head: 'Archivo Black', 'Arial Black', Impact, sans-serif;
+  --head: 'Jersey 10', 'Arial Black', Impact, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
   --gutter: 16px; --r: 6px;
   color-scheme: dark;
